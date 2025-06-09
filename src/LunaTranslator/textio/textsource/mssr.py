@@ -23,15 +23,13 @@ class mssr(basetext):
         dllp = "C:\\Windows\\SystemApps\\LKG\\MicrosoftWindows.LKG.SpeechRuntime_cw5n1h2txyewy"
         if checkdir(dllp):
             return dllp
-        for _dir, _, __fs in os.walk("."):
-            for _f in __fs:
-                if _f == dll:
-                    return os.path.abspath(_dir)
+        for _dir, _, __ in os.walk("."):
+            if checkdir(_dir):
+                return os.path.abspath(_dir)
 
-        for _dir, _, __fs in os.walk(r"C:\Windows\SystemApps"):
-            for _f in __fs:
-                if _f == dll:
-                    return os.path.abspath(_dir)
+        for _dir, _, __ in os.walk(r"C:\Windows\SystemApps"):
+            if checkdir(_dir):
+                return os.path.abspath(_dir)
 
     def findspeech(self):
         path = globalconfig["sourcestatus2"]["mssr"]["path"]
@@ -116,6 +114,7 @@ class mssr(basetext):
             if iserr:
                 sz = c_int.from_buffer_copy(windows.ReadFile(self.hPipe, 4)).value
                 text = windows.ReadFile(self.hPipe, sz).decode()
+                gobject.baseobject.displayinfomessage(text, "<msg_error_Origin>")
                 raise Exception(text)
             else:
                 t = c_int.from_buffer_copy(windows.ReadFile(self.hPipe, 4)).value
