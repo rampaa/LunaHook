@@ -878,5 +878,22 @@
     "在浏览器中查词": "Cercare parole nel browser",
     "确认是 %s 引擎": "Confermato che è il motore %s.",
     "使用的网络代理可能无效，请进行检查！({})": "Il proxy di rete utilizzato potrebbe non essere valido, si prega di verificare! ({})",
-    "网络错误": "Errore di rete"
+    "网络错误": "Errore di rete",
+    "选取同名全部": "Seleziona tutti con lo stesso nome",
+    "隐藏延迟（秒）": "Ritardo nascosto (secondi)",
+    "光标静止时自动隐藏": "Il cursore si nasconde automaticamente quando è fermo.",
+    "左上角": "In alto a sinistra",
+    "顶部居中": "In alto al centro",
+    "右上角": "In alto a destra",
+    "左对齐": "Allinea a sinistra",
+    "右对齐": "Allinea a destra",
+    "左下角": "In basso a sinistra",
+    "底部居中": "Centrato in basso",
+    "右下角": "In basso a destra",
+    "输出画面位置": "Posizione di uscita dello schermo",
+    "禁用缩放窗口置顶": "Disattiva il ridimensionamento e mantieni la finestra in primo piano",
+    "默认折叠": "Predefinito ripiegato",
+    "优先级": "Priorità",
+    "调整优先级": "Regolare la priorità",
+    "调整为": "Regolato"
 }

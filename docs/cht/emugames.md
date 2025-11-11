@@ -4,7 +4,7 @@ LunaTranslator 透過模擬器支援大量遊戲。對於未支援的遊戲，�
 
 | 平台 | 支援的模擬器 |
 | - | - |
-| NS | ~~yuzu(&ge;1616)~~, ~~sudachi~~, [<s>Eden</s>](https://eden-emu.dev/), [Citron](https://citron-emu.org/)|
+| NS | ~~yuzu(&ge;1616)~~, ~~sudachi~~, [Eden](https://eden-emu.dev/), [Citron](https://citron-emu.org/)|
 | PSP | [PPSSPP](https://github.com/hrydgard/ppsspp) &ge;v1.15.0 |
 | PSV | [Vita3K](https://github.com/Vita3K/Vita3K) &ge;v0.1.9.3339 |
 | PS2 | [PCSX2](https://github.com/PCSX2/pcsx2) &ge;v1.7.4473 |
@@ -17,6 +17,7 @@ LunaTranslator 透過模擬器支援大量遊戲。對於未支援的遊戲，�
 
 |  | ID       | Game                |
 | ---- | ---------- | ------------------- |
+|  | 01008D101EC40000 | The Ancient Magus' Bride Midsummer Pilgrimage |
 |  | 0100EC30206AE000 | 白恋サクラ＊グラム |
 |  | 0100B38021590000 | もし、この世界に神様がいるとするならば |
 |  | 010015301DB94000 | オンエア！ |
@@ -233,7 +234,7 @@ LunaTranslator 透過模擬器支援大量遊戲。對於未支援的遊戲，�
 |  | 0100C4E013E5E000 | Ni no Kuni II: Revenant Kingdom |
 |  | 0100F7700CB82000 | 遙かなる時空の中で６ DX |
 |  | 0100CF400F7CE000 | 遙かなる時空の中で7 |
-|  | 0100D11018A7E000 | アンジェリーク ルミナライズ |
+|  | 0100E190117D6000 | アンジェリーク ルミナライズ |
 |  | 010065301A2E0000 | Star Ocean The Second Story R |
 |  | 010012A017F18000 | 魔法使いの夜 通常版 |
 |  | 01001DC01486A000 | 月姫 -A piece of blue glass moon- |
@@ -916,6 +917,7 @@ LunaTranslator 透過模擬器支援大量遊戲。對於未支援的遊戲，�
 
 |  | ID       | Game                |
 | ---- | ---------- | ------------------- |
+|  | SLPM-65971 | そして僕らは、・・・and he said |
 |  | SLPM-65710 | Apocripha/0 |
 |  | SLPM-65943 | Angel's Feather −黒の残影− |
 |  | SLPM-66980 | 銀のエクリプス |

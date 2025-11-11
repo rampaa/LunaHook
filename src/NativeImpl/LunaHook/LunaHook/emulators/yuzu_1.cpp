@@ -2776,6 +2776,8 @@ struct emfuncinfoX
     emfuncinfo info;
 };
 static const emfuncinfoX emfunctionhooks_1[] = {
+    // The Ancient Magus' Bride Midsummer Pilgrimage
+    {0x8006F4E0, {CODEC_UTF16 | FULL_STRING, 1, 0, 0, f010061A01C1CE000, 0x01008D101EC40000ull, "1.0.0"}},
     // 白恋サクラ＊グラム
     {0x8048ECB4, {CODEC_UTF8 | FULL_STRING, 0, 0, T0100EC30206AE000, F01003080177CA000, 0x0100EC30206AE000ull, "1.0.0"}},
     // もし、この世界に神様がいるとするならば
@@ -3679,9 +3681,9 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x80010b48, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100CF400F7CE000ull, "1.0.0"}}, // prompt
     {0x80010c80, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100CF400F7CE000ull, "1.0.0"}}, // choice
     // アンジェリーク ルミナライズ
-    {0x80046c04, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100D11018A7E000ull, "1.0.0"}}, // ingameDialogue, sjis
-    {0x80011284, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100D11018A7E000ull, "1.0.0"}}, // choice
-    {0x80011140, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100D11018A7E000ull, "1.0.0"}}, // prompt first
+    {0x80046c04, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100E190117D6000ull, "1.0.0"}}, // ingameDialogue, sjis
+    {0x80011284, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100E190117D6000ull, "1.0.0"}}, // choice
+    {0x80011140, {0, 0, 0, T0100CF400F7CE000, F0100B5801D7CE000, 0x0100E190117D6000ull, "1.0.0"}}, // prompt first
     // Star Ocean The Second Story R
     {0x81d5e4d0, {0, 1, 0, ReadUnityString, F010065301A2E0000, 0x010065301A2E0000ull, "1.0.2"}}, // Main Text + Tutorial
     {0x81d641b4, {0, 0, 0, ReadUnityString, F010065301A2E0000, 0x010065301A2E0000ull, "1.0.2"}}, // Intro Cutscene
