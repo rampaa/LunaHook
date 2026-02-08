@@ -33,11 +33,13 @@ endif()
 set(shareddllproxy_common 
 	shareddllproxy.cpp dllinject.cpp update.cpp ${versioninfo})
 
+	
 if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
 	add_executable(shareddllproxy ${shareddllproxy_common} 
 	SnippingTool.cpp 
     msnaturalvoice.cpp
-    mssr.cpp ../NativeUtils/applicationloopbackaudio/LoopbackCapture.cpp)
+    mssr.cpp 
+	../NativeUtils/loopbackaudio/LoopbackCapture.cpp ../NativeUtils/loopbackaudio/LoopbackTranditional.cpp)
 
 else()
 	add_executable(shareddllproxy ${shareddllproxy_common} lec.cpp Atlas.cpp eztrans.cpp dreye.cpp jbj7.cpp kingsoft.cpp neospeech.cpp)
@@ -65,3 +67,4 @@ if(WIN10ABOVE)
 endif()
 
 target_link_libraries(shareddllproxy PRIVATE FileLocksmith base64)
+target_link_libraries(shareddllproxy PRIVATE delayimp)

@@ -8,9 +8,11 @@ from gui.usefulwidget import (
     getsimplepatheditor,
     getboxlayout,
     SuperCombo,
+    getsimplecombobox,
 )
+from gui.dynalang import LPushButton
 from myutils.magpie_builtin import AdapterService
-import functools, os
+import functools, os, json
 
 
 class SuperCombo__1(SuperCombo):
@@ -63,11 +65,37 @@ def createadaptercombo():
 def __getsavedir():
     screenshotsDir = magpie_config["overlay"]["screenshotsDir"]
     if not screenshotsDir:
-        try:
-            return os.path.join(os.environ["USERPROFILE"], r"Pictures\Screenshots")
-        except:
-            pass
+        return os.path.expanduser("~/Pictures/Screenshots")
     return screenshotsDir
+
+
+def __select(combo: SuperCombo):
+    p = os.path.expanduser("~/AppData/Local/Magpie/config")
+    if not os.path.isdir(p):
+        p = None
+    f = QFileDialog.getOpenFileName(directory=p, filter="config.json")
+    res = f[0]
+    if res:
+        print(res)
+        with open(res, "r", encoding="utf8") as ff:
+            __ = json.load(ff)
+        combo.clear()
+        combo.addItems([_["name"] for _ in __["scalingModes"]])
+        combo.setCurrentIndex(__["profiles"][0]["scalingMode"])
+        magpie_config["scalingModes"] = __["scalingModes"]
+
+
+def __layout():
+    combo = getsimplecombobox(
+        [_["name"] for _ in magpie_config["scalingModes"]],
+        magpie_config["profiles"][globalconfig["profiles_index"]],
+        "scalingMode",
+        static=True,
+    )
+    btn = LPushButton("导入")
+    btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+    btn.clicked.connect(functools.partial(__select, combo))
+    return getboxlayout([combo, btn])
 
 
 def makescalew():
@@ -77,17 +105,7 @@ def makescalew():
                 title="常规",
                 grid=(
                     [
-                        [
-                            "缩放模式",
-                            D_getsimplecombobox(
-                                [_["name"] for _ in magpie_config["scalingModes"]],
-                                magpie_config["profiles"][
-                                    globalconfig["profiles_index"]
-                                ],
-                                "scalingMode",
-                                static=True,
-                            ),
-                        ],
+                        ["缩放模式", __layout],
                         [
                             "捕获模式",
                             D_getsimplecombobox(
@@ -292,6 +310,26 @@ def makescalew():
                             ),
                         ],
                         [
+                            "光标静止时自动隐藏",
+                            D_getsimpleswitch(
+                                magpie_config["profiles"][
+                                    globalconfig["profiles_index"]
+                                ],
+                                "autoHideCursorEnabled",
+                            ),
+                            "",
+                            "隐藏延迟（秒）",
+                            D_getspinbox(
+                                0.1,
+                                5,
+                                magpie_config["profiles"][
+                                    globalconfig["profiles_index"]
+                                ],
+                                "autoHideCursorDelay",
+                                double=True,
+                            ),
+                        ],
+                        [
                             "缩放时调整光标速度",
                             D_getsimpleswitch(
                                 magpie_config["profiles"][
@@ -340,6 +378,26 @@ def makescalew():
                             ),
                         ],
                         [
+                            "输出画面位置",
+                            D_getsimplecombobox(
+                                [
+                                    "左上角",
+                                    "顶部居中",
+                                    "右上角",
+                                    "左对齐",
+                                    "居中",
+                                    "右对齐",
+                                    "左下角",
+                                    "底部居中",
+                                    "右下角",
+                                ],
+                                magpie_config["profiles"][
+                                    globalconfig["profiles_index"]
+                                ],
+                                "destAlignment",
+                            ),
+                        ],
+                        [
                             "禁用DirectFlip",
                             D_getsimpleswitch(
                                 magpie_config["profiles"][
@@ -368,6 +426,13 @@ def makescalew():
                         D_getsimpleswitch(
                             magpie_config,
                             "benchmarkMode",
+                        ),
+                    ],
+                    [
+                        "禁用缩放窗口置顶",
+                        D_getsimpleswitch(
+                            magpie_config,
+                            "disableTopmost",
                         ),
                     ],
                     [

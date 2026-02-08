@@ -64,8 +64,25 @@ istest = False
 
 
 class Consts:
-    buttoncolor = "#FF69B4"
-    buttoncolor_disable = "#afafaf"
+    class btncolor:
+        class light:
+            class enabled:
+                back = "#FF69B4"
+                center = "white"
+
+            class disabled:
+                back = "transparent"
+                center = "#5D5D5D"
+
+        class dark:
+            class enabled:
+                back = "#FF69B4"
+                center = "black"
+
+            class disabled:
+                back = "transparent"
+                center = "#CDCED1"
+
     btnscale = 1.2
     toolwdivh = 4 / 3
     toolscale = 1.5
@@ -76,13 +93,13 @@ runtime_for_xp = tuple(sys.version_info)[:2] == (3, 4)
 runtime_for_win10 = tuple(sys.version_info)[:2] >= (3, 9)
 
 if runtime_for_win10:
-    runtimedir = "runtime31264"
+    runtimedir = "runtime3.13-64"
 elif runtime_for_xp:
-    runtimedir = "runtime3432"
+    runtimedir = "runtime3.4-32"
 elif runtime_bit_64:
-    runtimedir = "runtime3764"
+    runtimedir = "runtime3.7-64"
 else:
-    runtimedir = "runtime3732"
+    runtimedir = "runtime3.7-32"
 runtimedir = "files/" + runtimedir
 sys_le_xp = int(platform.version().split(".")[0]) <= 5
 

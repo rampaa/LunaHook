@@ -52,7 +52,7 @@ Some buttons have two icons to indicate two different states. Some buttons only 
 
     When the mouse moves to the **area of the Mouse Through Window button and one button to the left and right**, it will automatically exit through to use the tool buttons; it will automatically restore through when moving out of the area.
 
-1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> Background Window Transparency {#anchor-backtransbutton}
+1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> Window background transparency {#anchor-backtransbutton}
     The function of this button is to switch the opacity of the translation window to 0 with one click. This switch will not cause the original opacity settings to be forgotten.
     
 1. #### <i class="fa fa-lock"></i> <i class="btnstatus2 fa fa-unlock"></i> Lock Toolbar {#anchor-locktoolsbutton}
@@ -139,7 +139,7 @@ Some buttons have two icons to indicate two different states. Some buttons only 
     This reading will ignore `Skip` (if in `Voice Settings`, the current text target is matched as `Skip`, then using the button for reading will ignore the skip and force the reading).
 1. #### <i class="fa fa-copy"></i> <i class="fa fa-icon fa-rotate-right"></i> Copy to Clipboard {#anchor-copy}
     Copy the currently extracted text to the clipboard once. If you want to automatically extract to the clipboard, enable `Core Settings` → `Clipboard` → `Output` → `Auto Output Text` and underneath it `Content` → `Original Text`.
-1. #### <i class="fa fa-rotate-left"></i> <i class="fa fa-icon fa-rotate-right"></i> Show/Hide History Text {#anchor-history}
+1. #### <i class="fa fa-history"></i> <i class="fa fa-icon fa-rotate-right"></i> Show/Hide History Text {#anchor-history}
     Open or close the history text window.
 1. #### <i class="fa fa-gamepad"></i> <i class="fa fa-icon fa-rotate-right"></i> Game Management {#anchor-gamepad_new}
     Open the game manager interface.

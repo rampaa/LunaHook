@@ -234,6 +234,35 @@ class QTextBrowser_1(QTextEdit):
             return super().mouseMoveEvent(ev)
 
 
+class TextAreaBack(QLabel):
+    def paintEvent(self, a0):
+        parent: TextBrowser = self.parent()
+        parent.yinyinglabels
+        c = QColor(globalconfig["text_area_background_color"])
+        c.setAlphaF(globalconfig["text_area_background_alpha"] / 100)
+
+        painter = QPainter(self)
+        painter.setCompositionMode(QPainter.CompositionMode.CompositionMode_Source)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        __r = globalconfig["text_area_background_r"]
+        __h = globalconfig["text_area_background_h"]
+        __w = globalconfig["text_area_background_w"]
+        xpath = QPainterPath()
+        for label in parent.yinyinglabels:
+            if not label.isVisible():
+                continue
+            r = QRectF()
+            r.setTop(label.realy() - __h)
+            r.setLeft(label.realx() - __w)
+            r.setHeight(label.realh() + 2 * __h)
+            r.setWidth(label.realw() + 2 * __w)
+            path = QPainterPath()
+            path.addRoundedRect(r, __r, __r)
+            xpath = xpath.united(path)
+        painter.fillPath(xpath, c)
+        return super().paintEvent(a0)
+
+
 class TextBrowser(QWidget, dataget):
     contentsChanged = pyqtSignal(QSize)
     dropfilecallback = pyqtSignal(str)
@@ -273,6 +302,7 @@ class TextBrowser(QWidget, dataget):
     def resizeEvent(self, event: QResizeEvent):
         self.atback2.resize(event.size())
         self.atback_color.resize(event.size())
+        self.drawtextarealabel.resize(event.size())
         self.toplabel2.resize(event.size())
         self.masklabel.resize(event.size())
 
@@ -285,16 +315,23 @@ class TextBrowser(QWidget, dataget):
         menu = QMenu(gobject.base.commonstylebase)
         search = LAction("清空", menu)
         drag = LAction("可拖动的", menu)
+        hide = LAction("隐藏工具栏", menu)
         drag.setCheckable(True)
         drag.setChecked(globalconfig["dragable"])
+        hide.setCheckable(True)
+        hide.setChecked(globalconfig["hidetools"])
         menu.addAction(search)
         menu.addAction(drag)
+        menu.addAction(hide)
         action = menu.exec(QCursor.pos())
         if action == search:
             self.parent().clear(False)
             gobject.base.currenttext = ""
         elif action == drag:
             globalconfig["dragable"] = drag.isChecked()
+        elif action == hide:
+            globalconfig["hidetools"] = hide.isChecked()
+            gobject.base.translation_ui.enterfunction()
 
     def mouseMoveEvent(self, a0: QMouseEvent):
         if not globalconfig["dragable"]:
@@ -350,6 +387,9 @@ class TextBrowser(QWidget, dataget):
         self.cleared = True
 
         self.setAcceptDrops(True)
+        self.drawtextarealabel = TextAreaBack(self)
+        self.drawtextarealabel.setMouseTracking(True)
+        self.showtextareabackground(globalconfig["text_area_background"])
         self.atback_color = QLabel(self)
         self.atback_color.setMouseTracking(True)
         self.atback2 = QLabel(self)
@@ -468,6 +508,12 @@ class TextBrowser(QWidget, dataget):
     def showatcenter(self, center):
         self.showatcenterflag = center
         self.parent().refreshcontent()
+
+    def showtextareabackground(self, show):
+        self.drawtextarealabel.setVisible(show)
+
+    def setTextAreaBackStyle(self, **_):
+        self.drawtextarealabel.update()
 
     def showhidetranslate(self, show):
         self.parent().refreshcontent()

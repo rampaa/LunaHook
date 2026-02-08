@@ -8,7 +8,8 @@ class TS(basetrans):
         module = checkmd5reloadmodule(gobject.getconfig("selfbuild.py"), "selfbuild")
         if module and (module.TS != self.__lastm):
             self.__lastm = module.TS
-            self.internal = module.TS("selfbuild")
+            self.internal: basetrans = module.TS("selfbuild")
+            self.internal.init()
 
     def init(self):
         self.internal = None

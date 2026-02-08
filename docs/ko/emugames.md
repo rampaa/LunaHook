@@ -4,7 +4,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 
 | 플랫폼 | 지원되는 에뮬레이터 |
 | - | - |
-| NS | ~~yuzu(&ge;1616)~~, ~~sudachi~~, [<s>Eden</s>](https://eden-emu.dev/), [Citron](https://citron-emu.org/)|
+| NS | ~~yuzu(&ge;1616)~~, ~~sudachi~~, [~~Eden(&le;v0.0.4rc1)~~](https://eden-emu.dev/), [Citron](https://citron-emu.org/)|
 | PSP | [PPSSPP](https://github.com/hrydgard/ppsspp) &ge;v1.15.0 |
 | PSV | [Vita3K](https://github.com/Vita3K/Vita3K) &ge;v0.1.9.3339 |
 | PS2 | [PCSX2](https://github.com/PCSX2/pcsx2) &ge;v1.7.4473 |
@@ -17,6 +17,18 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 
 |  | ID       | Game                |
 | ---- | ---------- | ------------------- |
+|  | 010016C011AAA000 | この素晴らしい世界に祝福を！　この欲望の衣装に寵愛を！ |
+|  | 010068501FF9A000 | UN:LOGICAL |
+|  | 0100A05026270000 | KANADE |
+|  | 01005FE025F22000 | Apathy 鳴神学園 霊怪記 |
+|  | 0100A19025D44000 | Neon Clash Echoes of the Lost |
+|  | 01003CA01F3AE000 | Please Be Happy |
+|  | 010045702355C000 | 星空鉄道とシロの旅 |
+|  | 010024F024250000 | 闇色の魔珠 |
+|  | 0100D8B01D4FA000 | かまいたちの夜×３ |
+|  | 0100D870102BC000 | DESIRE remaster ver. |
+|  | 010063C0212BE000 | PanicPalette ～パニックパレット～ |
+|  | 01008D101EC40000 | The Ancient Magus' Bride Midsummer Pilgrimage |
 |  | 0100EC30206AE000 | 白恋サクラ＊グラム |
 |  | 0100B38021590000 | もし、この世界に神様がいるとするならば |
 |  | 010015301DB94000 | オンエア！ |
@@ -159,6 +171,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | 01006B000A666000 | Cendrillon palikA |
 |  | 01007B601C608000 | Crayon Shin-chan Shiro of Coal Town |
 |  | 010046601125A000 | 風雨来記4 |
+|  | 010012601EC54000 | 風雨来記5 |
 |  | 0100771013FA8000 | 剣が君 for S |
 |  | 0100556015CCC000 | ANONYMOUS;CODE |
 |  | 0100325012B70000 | Sugar * Style |
@@ -182,6 +195,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | 0100EDD018032000 | Harvestella |
 |  | 0100F8A017BAA000 | 千の刃濤、桃花染の皇姫 |
 |  | 0100F9D00C186000 | オランピアソワレ |
+|  | 0100D8002067A000 | オランピアソワレ Catharsis |
 |  | 0100F7401AA74000 | 月影の鎖 -錯乱パラノイア- |
 |  | 0100F3400332C000 | Xenoblade Chronicles 2 |
 |  | 0100FB7019ADE000 | Kanon |
@@ -233,7 +247,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | 0100C4E013E5E000 | Ni no Kuni II: Revenant Kingdom |
 |  | 0100F7700CB82000 | 遙かなる時空の中で６ DX |
 |  | 0100CF400F7CE000 | 遙かなる時空の中で7 |
-|  | 0100D11018A7E000 | アンジェリーク ルミナライズ |
+|  | 0100E190117D6000 | アンジェリーク ルミナライズ |
 |  | 010065301A2E0000 | Star Ocean The Second Story R |
 |  | 010012A017F18000 | 魔法使いの夜 通常版 |
 |  | 01001DC01486A000 | 月姫 -A piece of blue glass moon- |
@@ -411,6 +425,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | ULJM06210 | Starry☆Sky～After Winter～Portable |
 |  | ULJM06104 | アラビアンズ・ロスト |
 |  | ULJM05334 | MEMORIES OFF |
+|  | ULJM06111 | しろくまベルスターズ♪ ハッピー・ホリデーズ！ |
 |  | ULJM06286 | 恋花デイズ |
 |  | ULJS00216 | 雨格子の館 PORTABLE 一柳和、最初の受難 |
 |  | ULJS00230 | 奈落の城 PORTABLE 一柳和、2度目の受難 |
@@ -736,6 +751,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 
 |  | ID       | Game                |
 | ---- | ---------- | ------------------- |
+|  | PCSG00664 | なないろ リンカネーション |
 |  | PCSG00944 | 白と黒のアリス |
 |  | PCSG01192 | 白と黒のアリス -Twilight line- |
 |  | PCSG00458 | ROOT∞REXX |
@@ -901,6 +917,7 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | PCSG01203 | タユタマ２ -you're the only one- |
 |  | PCSG01034 | 戦極姫７～戦雲つらぬく紅蓮の遺志～ |
 |  | PCSG00481 | 新装版クリムゾン・エンパイア |
+|  | PCSG00914 | うたの☆プリンスさまっ♪Repeat LOVE |
 |  | PCSG01081 | うたの☆プリンスさまっ♪Amazing Aria & Sweet Serenade LOVE |
 |  | PCSG00745 | スカーレッドライダーゼクス |
 |  | PCSG00615 | 東京喰種トーキョーグール JAIL |
@@ -916,6 +933,17 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 
 |  | ID       | Game                |
 | ---- | ---------- | ------------------- |
+|  | SLPS-25282 | 学園ヘヴン BOY'S LOVE SCRAMBLE！ |
+|  | SLPM-55121 | 不確定世界の探偵紳士 ～悪行双麻の事件ファイル～ |
+|  | SLPS-25887 | スーパーロボット大戦Ｚ |
+|  | SLPS-25920 | スーパーロボット大戦Z スペシャルディスク |
+|  | SLPM-66882 | はかれなはーと ～君がために輝きを～ |
+|  | SLPM-66471 | 花帰葬 |
+|  | SLPS-25444 | Cherry blossom ～チェリーブロッサム～ |
+|  | SLPM-66390 | 薔薇ノ木ニ薔薇ノ花咲ク -Das Versprechen- |
+|  | SLPM-55032 | ピヨたん ～お屋敷潜入大作戦～ |
+|  | SLPS-25494 | Fragrance Tale ～フレグランス テイル～ |
+|  | SLPM-65971 | そして僕らは、・・・and he said |
 |  | SLPM-65710 | Apocripha/0 |
 |  | SLPM-65943 | Angel's Feather −黒の残影− |
 |  | SLPM-66980 | 銀のエクリプス |
@@ -1221,8 +1249,9 @@ LunaTranslator는 에뮬레이터를 통해 많은 게임을 지원합니다. �
 |  | SLPS-25902 | 純情ロマンチカ ～恋のドキドキ大作戦 |
 |  | SLPS-25662 | 今日からマ王！はじマりの旅 [プレミアムBOX] |
 |  | SLPS-25801 | 今日からマ王！ 眞マ国の休日 |
+|  | SLPM-65834 & SLPM-65849 & SLPM-65850 | 遙かなる時空の中で3 |
 |  | SLPM-66344 & SLPM-66347 & SLPM-66348 | 遙かなる時空の中で3 運命の迷宮 |
-|  | SLPM-66127 | 遙かなる時空の中で3 十六夜記 Harukanaru Toki no Naka de 3 - Izayoiki |
+|  | SLPM-66099 & SLPM-66100 & SLPM-66127 | 遙かなる時空の中で3 十六夜記 Harukanaru Toki no Naka de 3 - Izayoiki |
 |  | SLPM-66952 | 遙かなる時空の中で4 |
 |  | SLPM-65512 & SLPM-65513 | Angel's Feather |
 |  | SLPM-65848 | 空色の風琴 ～Remix～ |

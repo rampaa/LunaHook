@@ -175,7 +175,7 @@ namespace
         {
             return buffer->clear();
         }
-        auto w = *(WORD *)buffer->buff;
+        auto w = *(WORD *)buffer->data;
         if (!(IsShiftjisWord(w)))
         {
             return buffer->clear();
@@ -193,9 +193,17 @@ namespace
         CharFilter(buffer, L'\r');
         CharFilter(buffer, L'\n');
     }
-    void SLPS25283(TextBuffer *buffer, HookParam *hp)
+    void SLPS25395(TextBuffer *buffer, HookParam *hp)
     {
-        StringFilter(buffer, TEXTANDLEN("\\n"));
+        auto s = buffer->strA();
+        s = re::sub(s, R"(\\n(\x81\x40)*)");
+        buffer->from(s);
+    }
+    void SLPS25887(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        s = re::sub(s, R"(\n(\x81\x40)*)");
+        buffer->from(s);
     }
     void SLPM66543(TextBuffer *buffer, HookParam *hp)
     {
@@ -245,6 +253,16 @@ namespace
             return buffer->clear();
         last = s;
         buffer->fromWA(strReplace(s, L"/"));
+    }
+    void FSLPM65971(TextBuffer *buffer, HookParam *hp)
+    {
+        static lru_cache<std::string> cache(4);
+        auto s = buffer->strA();
+        if (cache.touch(s))
+            return buffer->clear();
+        if (startWith(s, "\x81\x40"))
+            s = s.substr(2);
+        buffer->from(strReplace(s, "\r"));
     }
     void SLPM65943(TextBuffer *buffer, HookParam *hp)
     {
@@ -476,7 +494,7 @@ namespace
     }
     void SLPM55240(TextBuffer *buffer, HookParam *hp)
     {
-        StringReplacer(buffer, TEXTANDLEN("%x02―%x01"), TEXTANDLEN("\x81\x5c\x81\x5c")); //"――"
+        StringReplacer(buffer, TEXTANDLEN("%x02\x81\x5c%x01"), TEXTANDLEN("\x81\x5c\x81\x5c")); //"――"
     }
     void FSLPM55195(TextBuffer *buffer, HookParam *hp)
     {
@@ -609,6 +627,46 @@ namespace
         }
         last = s;
         buffer->from(strReplace(s, "\x01"));
+    }
+    void SLPM66882(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        switch ((*(uintptr_t *)PCSX2_REG(a0)) & 0xffffff)
+        {
+        case 0x47b480:
+            buffer->from("\x81\x79" + s + "\x81\x7a");
+            break;
+        case 0x7b2b00:
+        {
+            static std::string last;
+            if (startWith(s, last))
+            {
+                buffer->from(strReplace(strReplace(s.substr(last.size()), "\x81\x40"), "\n"));
+            }
+            else
+            {
+                buffer->from(strReplace(strReplace(s, "\x81\x40"), "\n"));
+            }
+            last = s;
+        }
+        break;
+        default:
+            buffer->from(s + "\n");
+        }
+    }
+    void SLPM66390(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        static std::string last;
+        if (endWith(last, s))
+        {
+            buffer->clear();
+        }
+        else
+        {
+            buffer->from(re::sub(s, "[\r\n]+(\x81\x40)*"));
+        }
+        last = s;
     }
     void SLPS25193(TextBuffer *buffer, HookParam *hp)
     {
@@ -813,6 +871,12 @@ namespace
         strReplace(s, "%n");
         buffer->from(s);
     }
+    void SLPM65971(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
+    {
+        if ((WORD)PCSX2_REG(v1) != 1)
+            return;
+        buffer->from((char *)PCSX2_REG(s0));
+    }
     void SLPM65710(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
     {
         if ((WORD)PCSX2_REG(s4) != 0x2f3c)
@@ -898,10 +962,6 @@ namespace
         StringFilter(buffer, TEXTANDLEN("\\n"));
         CharFilter(buffer, '\n');
         CharFilter(buffer, '\x01');
-    }
-    void SLPM65843(TextBuffer *buffer, HookParam *hp)
-    {
-        StringFilter(buffer, TEXTANDLEN("\\n"));
     }
     void SLPS25679(TextBuffer *buffer, HookParam *hp)
     {
@@ -1046,6 +1106,21 @@ namespace
         s = re::sub(s, R"(\$s\d+)");
         buffer->from(s);
     }
+    void SLPS20353(TextBuffer *buffer, HookParam *hp)
+    {
+        static std::string last;
+        auto s = buffer->strA();
+        if (endWith(last, s))
+        {
+            return buffer->clear();
+        }
+        last = s;
+        strReplace(s, "$t");
+        strReplace(s, "$d");
+        s = re::sub(s, "\x81\x69(.*?)\x81\x6a");
+        strReplace(s, "\x81\x79\x81\x7a");
+        buffer->from(s);
+    }
     void SLPM66460(TextBuffer *buffer, HookParam *hp)
     {
         static std::string last;
@@ -1125,231 +1200,15 @@ namespace
         s1 = re::sub(s1, R"(^\d+)");
         buffer->from(s1);
     }
-    WORD SLPM66163ReadChar()
+    void SLPM66163(TextBuffer *buffer, HookParam *hp)
     {
-        const uintptr_t val_a0 = PCSX2_REG(a0);
-        const uintptr_t val_s0 = PCSX2_REG(s0);
-        uint8_t *bytes = (uint8_t *)&val_a0;
-        uint8_t b1 = bytes[3];
-        uint8_t b2 = bytes[2];
-        uint8_t b3 = bytes[1];
-        uint8_t b4 = bytes[0];
-        //  ConsoleOutput("b1=0x%x b2=0x%x b3=0x%x b4=0x%x", b1, b2, b3, b4);
-
-        // 0x00 被输出
-        if (!b2 && !b3 && !b4)
-        {
-            return 0;
-        }
-
-        const uint8_t byteval = b4;
-
-        const bool is_normal_sjis = ((byteval >= 0x81 && byteval <= 0x9F) || (byteval >= 0xE0 && byteval <= 0xEF));
-
-        if (is_normal_sjis)
-        {
-            // it's a normal 2-byte Shift-JIS character
-            const uintptr_t p1 = val_s0 & 0x0FFFFFFF;
-            uint8_t *storageptr = (uint8_t *)emu_addr(p1);
-            if (!storageptr || storageptr == nullptr)
-            {
-                return 0;
-            }
-            uint8_t b0 = storageptr[0];
-            uint8_t b1 = storageptr[1];
-            const uintptr_t sjis = ((uintptr_t)b1 << 8) | b0;
-            //    ConsoleOutput("2sjis: 0x%x", sjis);
-            return sjis;
-        }
-        else
-        {
-            // it's the game's custom 1-byte encoding
-            uintptr_t sjis = 0x0;
-            switch (byteval)
-            {
-                // clang-format off
-                case 0xd7:sjis=0xE782;break;
-                case 0xd8:sjis=0xE882;break;
-                case 0xd9:sjis=0xE982;break;
-                case 0xda:sjis=0xEA82;break;
-                case 0xdb:sjis=0xEB82;break;
-                case 0xdc:sjis=0xED82;break;
-                case 0xdd:sjis=0xF182;break;
-                case 0xde:sjis=0x4A81;break;
-                case 0xdf:sjis=0x4B81;break;
-                case 0x22:sjis=0x6881;break;
-                case 0x23:sjis=0x23;break;
-                case 0x24:sjis=0x24;break;
-                case 0x25:sjis=0x25;break;
-                case 0x26:sjis=0x26;break;
-                case 0x27:sjis=0x27;break;
-                case 0x28:sjis=0x28;break;
-                case 0x29:sjis=0x29;break;
-                case 0x2a:sjis=0x2A;break;
-                case 0x2b:sjis=0x2B;break;
-                case 0x2c:sjis=0x2C;break;
-                case 0x2d:sjis=0x2D;break;
-                case 0x2e:sjis=0x2E;break;
-                case 0x2f:sjis=0x2F;break;
-                case 0x30:sjis=0x30;break;
-                case 0x31:sjis=0x31;break;
-                case 0x32:sjis=0x32;break;
-                case 0x33:sjis=0x33;break;
-                case 0x34:sjis=0x34;break;
-                case 0x35:sjis=0x35;break;
-                case 0x36:sjis=0x36;break;
-                case 0x37:sjis=0x37;break;
-                case 0x38:sjis=0x38;break;
-                case 0x39:sjis=0x39;break;
-                case 0x3a:sjis=0x3A;break;
-                case 0x3b:sjis=0x3B;break;
-                case 0x3d:sjis=0x3D;break;
-                case 0x3e:sjis=0x3E;break;
-                case 0x3f:sjis=0x3F;break;
-                case 0x40:sjis=0x40;break;
-                case 0x41:sjis=0x41;break;
-                case 0x42:sjis=0x42;break;
-                case 0x43:sjis=0x43;break;
-                case 0x44:sjis=0x44;break;
-                case 0x45:sjis=0x45;break;
-                case 0x46:sjis=0x46;break;
-                case 0x47:sjis=0x47;break;
-                case 0x48:sjis=0x48;break;
-                case 0x49:sjis=0x49;break;
-                case 0x4a:sjis=0x4A;break;
-                case 0x4b:sjis=0x4B;break;
-                case 0x4c:sjis=0x4C;break;
-                case 0x4d:sjis=0x4D;break;
-                case 0x4e:sjis=0x4E;break;
-                case 0x4f:sjis=0x4F;break;
-                case 0x50:sjis=0x50;break;
-                case 0x51:sjis=0x51;break;
-                case 0x52:sjis=0x52;break;
-                case 0x53:sjis=0x53;break;
-                case 0x54:sjis=0x54;break;
-                case 0x55:sjis=0x55;break;
-                case 0x56:sjis=0x56;break;
-                case 0x57:sjis=0x57;break;
-                case 0x58:sjis=0x58;break;
-                case 0x59:sjis=0x59;break;
-                case 0x5a:sjis=0x5A;break;
-                case 0x5b:sjis=0x5B;break;
-                case 0x5c:sjis=0x5C;break;
-                case 0x5d:sjis=0x5D;break;
-                case 0x5e:sjis=0x5E;break;
-                case 0x5f:sjis=0x5F;break;
-                case 0x60:sjis=0x6581;break;
-                case 0x61:sjis=0x61;break;
-                case 0x62:sjis=0x62;break;
-                case 0x63:sjis=0x63;break;
-                case 0x64:sjis=0x64;break;
-                case 0x65:sjis=0x65;break;
-                case 0x66:sjis=0x66;break;
-                case 0x67:sjis=0x67;break;
-                case 0x68:sjis=0x68;break;
-                case 0x69:sjis=0x69;break;
-                case 0x6a:sjis=0x6A;break;
-                case 0x6b:sjis=0x6B;break;
-                case 0x6c:sjis=0x6C;break;
-                case 0x6d:sjis=0x6D;break;
-                case 0x6e:sjis=0x6E;break;
-                case 0x6f:sjis=0x6F;break;
-                case 0x70:sjis=0x70;break;
-                case 0x71:sjis=0x71;break;
-                case 0x72:sjis=0x72;break;
-                case 0x73:sjis=0x73;break;
-                case 0x74:sjis=0x74;break;
-                case 0x75:sjis=0x75;break;
-                case 0x76:sjis=0x76;break;
-                case 0x77:sjis=0x77;break;
-                case 0x78:sjis=0x78;break;
-                case 0x79:sjis=0x79;break;
-                case 0x7a:sjis=0x7A;break;
-                case 0x7c:sjis=0x7C;break;
-                case 0x7d:sjis=0x7D;break;
-                case 0xa1:sjis=0x4281;break;
-                case 0xa2:sjis=0x7581;break;
-                case 0xa3:sjis=0x7681;break;
-                case 0xa4:sjis=0x4181;break;
-                case 0xa5:sjis=0x4581;break;
-                case 0xa6:sjis=0xF082;break;
-                case 0xa7:sjis=0x9F82;break;
-                case 0xa8:sjis=0xA282;break;
-                case 0xa9:sjis=0xA482;break;
-                case 0xaa:sjis=0xA582;break;
-                case 0xab:sjis=0xA882;break;
-                case 0xac:sjis=0xE282;break;
-                case 0xad:sjis=0xE382;break;
-                case 0xae:sjis=0xE582;break;
-                case 0xaf:sjis=0xC182;break;
-                case 0xb0:sjis=0xEA88;break;
-                case 0xb1:sjis=0xA082;break;
-                case 0xb2:sjis=0xA282;break;
-                case 0xb3:sjis=0xA482;break;
-                case 0xb4:sjis=0xA682;break;
-                case 0xb5:sjis=0xA882;break;
-                case 0xb6:sjis=0xA982;break;
-                case 0xb7:sjis=0xAB82;break;
-                case 0xb8:sjis=0xAD82;break;
-                case 0xb9:sjis=0xAF82;break;
-                case 0xba:sjis=0xB182;break;
-                case 0xbb:sjis=0xB382;break;
-                case 0xbc:sjis=0xB582;break;
-                case 0xbd:sjis=0xB782;break;
-                case 0xbe:sjis=0xB982;break;
-                case 0xbf:sjis=0xBB82;break;
-                case 0xc0:sjis=0xBD82;break;
-                case 0xc1:sjis=0xBF82;break;
-                case 0xc2:sjis=0xC282;break;
-                case 0xc3:sjis=0xC482;break;
-                case 0xc4:sjis=0xC682;break;
-                case 0xc5:sjis=0xC882;break;
-                case 0xc6:sjis=0xC982;break;
-                case 0xc7:sjis=0xCA82;break;
-                case 0xc8:sjis=0xCB82;break;
-                case 0xc9:sjis=0xCC82;break;
-                case 0xca:sjis=0xCD82;break;
-                case 0xcb:sjis=0xD082;break;
-                case 0xcc:sjis=0xD382;break;
-                case 0xcd:sjis=0xD682;break;
-                case 0xce:sjis=0xD982;break;
-                case 0xcf:sjis=0xDC82;break;
-                case 0xd0:sjis=0xDD82;break;
-                case 0xd1:sjis=0xDE82;break;
-                case 0xd2:sjis=0xDF82;break;
-                case 0xd3:sjis=0xE082;break;
-                case 0xd4:sjis=0xE282;break;
-                case 0xd5:sjis=0xE482;break;
-                case 0xd6:sjis=0xE682;break;
-                // clang-format on
-            }
-            if (!sjis)
-            {
-                return 0;
-            }
-            //   ConsoleOutput("1sjis: 0x%x", sjis);
-            return sjis;
-        }
-    }
-    void SLPM66163(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
-    {
-        static std::string collect;
-        static lru_cache<std::string> last(4);
-        auto c = SLPM66163ReadChar();
-        if (c)
-        {
-            char bs[3] = {0};
-            *(WORD *)bs = c;
-            collect += bs;
-        }
-        else
-        {
-            if (collect.size() == 2 || !last.touch(collect))
-            {
-                buffer->from(collect);
-            }
-            collect.clear();
-        }
+        if ((BYTE)PCSX2_REG(at) != 0)
+            return buffer->clear();
+        static lru_cache<std::wstring> last(4);
+        auto s = buffer->strAW();
+        if (last.touch(s))
+            return buffer->clear();
+        buffer->fromWA(remapkatakana(re::sub(re::sub(s, LR"(\{(.*?)/.*?\})", L"$1"), L"<.*?>")));
     }
     void SLPM55184(TextBuffer *buffer, HookParam *hp)
     {
@@ -1357,16 +1216,16 @@ namespace
     }
     void SLPM66734(TextBuffer *buffer, HookParam *hp)
     {
-        auto w = *(WORD *)buffer->buff;
+        auto w = *(WORD *)buffer->data;
         if (!(IsShiftjisWord(w)))
         {
             return buffer->clear();
         }
-        buffer->size = strstr((char *)buffer->buff, "O$") - (char *)buffer->buff;
+        buffer->size = strstr((char *)buffer->data, "O$") - (char *)buffer->data;
     }
     void SLPM65786(TextBuffer *buffer, HookParam *hp)
     {
-        auto w = *(WORD *)buffer->buff;
+        auto w = *(WORD *)buffer->data;
         if (w == 0x4081 || !(IsShiftjisWord(w)))
         {
             buffer->clear();
@@ -1650,7 +1509,7 @@ namespace
     void SLPS25540(TextBuffer *buffer, HookParam *hp)
     {
         auto s = buffer->strA();
-        if (buffer->buff[0] <= 0x7f)
+        if (buffer->data[0] <= 0x7f)
             return buffer->clear();
         static std::set<std::string> cache;
         if (cache.find(s) != cache.end())
@@ -1734,7 +1593,7 @@ namespace
     }
     void SLPM65785(TextBuffer *buffer, HookParam *hp)
     {
-        if (*(WORD *)buffer->buff < 0x100)
+        if (*(WORD *)buffer->data < 0x100)
             buffer->clear();
     }
     void SLPM62375(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
@@ -1791,13 +1650,8 @@ namespace
     {
         auto s = buffer->strAW();
         s = re::sub(s, L"<.*?>");
-        strReplace(s, L"//　");
-        strReplace(s, L"//");
+        s = re::sub(s, L"//　*");
         buffer->fromWA(s);
-    }
-    void SLPS25395(TextBuffer *buffer, HookParam *hp)
-    {
-        StringFilter(buffer, TEXTANDLEN("\\n\x81\x40"));
     }
     void SLPM65555(TextBuffer *buffer, HookParam *hp)
     {
@@ -2021,7 +1875,7 @@ namespace
     void SLPM65295(TextBuffer *buffer, HookParam *hp)
     {
         static bool last = false;
-        if (IsShiftjisLeadByte(*(BYTE *)buffer->buff))
+        if (IsShiftjisLeadByte(*(BYTE *)buffer->data))
         {
             last = true;
         }
@@ -2075,7 +1929,7 @@ namespace
     }
     void SLPM65910(TextBuffer *buffer, HookParam *hp)
     {
-        if (buffer->buff[0] == '&')
+        if (buffer->data[0] == '&')
             return buffer->clear();
         auto s = buffer->strAW();
         s = s.substr(0, s.rfind(L"fV"));
@@ -2084,12 +1938,40 @@ namespace
     }
     void SLPM66980(TextBuffer *buffer, HookParam *hp)
     {
-        if (buffer->buff[0] == '&')
+        if (buffer->data[0] == '&')
             return buffer->clear();
         auto s = buffer->strAW();
         s = s.substr(0, s.rfind(L"E\""));
         s = re::sub(s, L"@　*");
         buffer->fromWA(s);
+    }
+    void SLPS25494(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->viewA();
+        if (all_ascii(s))
+            return buffer->clear();
+        if (s == "\x95\xb6\x8e\x9a\x94\xc5")
+            return buffer->clear();
+        SLPS25395(buffer, hp);
+    }
+    void SLPS25444(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strAW();
+        if (all_ascii(s))
+            return buffer->clear();
+        static std::wstring last;
+        if (last == s)
+            return buffer->clear();
+        last = s;
+        strReplace(s, L"\\c\\n", L"\n");
+        s = re::sub(s, L"@P@p *(.*?) *@0", L"【$1】");
+        buffer->fromWA(s);
+    }
+    void SLPM55121(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strAW();
+        if (s == L"<" || s == L"\n" || s == L"\r")
+            return buffer->clear();
     }
 }
 struct emfuncinfoX
@@ -2098,6 +1980,29 @@ struct emfuncinfoX
     emfuncinfo info;
 };
 static const emfuncinfoX emfunctionhooks_1[] = {
+    // 学園ヘヴン BOY'S LOVE SCRAMBLE！
+    {0x1d39b4, {FULL_STRING, PCSX2_REG_OFFSET(a0), 0, 0, all_ascii_Filter, "SLPS-25282"}},
+    // 不確定世界の探偵紳士 ～悪行双麻の事件ファイル～
+    {0x114128, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(s2), 0, 0, SLPM55121, "SLPM-55121"}},
+    // スーパーロボット大戦Ｚ
+    {0x1a0d88, {FULL_STRING, PCSX2_REG_OFFSET(a1), 0, 0, SLPS25887, "SLPS-25887"}},
+    // スーパーロボット大戦Z スペシャルディスク
+    {0x1a5238, {FULL_STRING, PCSX2_REG_OFFSET(a1), 0, 0, SLPS25887, "SLPS-25920"}},
+    // はかれなはーと ～君がために輝きを～
+    {0x1053d8, {0, PCSX2_REG_OFFSET(a1), 0, 0, SLPM66882, "SLPM-66882"}},
+    // 花帰葬
+    {0x15DAC0, {FULL_STRING, PCSX2_REG_OFFSET(a1), 0, 0, 0, "SLPM-66471"}},
+    // Cherry blossom ～チェリーブロッサム～
+    {0x128b78, {FULL_STRING, PCSX2_REG_OFFSET(a1), 0, 0, SLPS25444, "SLPS-25444"}},
+    // 薔薇ノ木ニ薔薇ノ花咲ク -Das Versprechen-
+    {0x1231C8, {FULL_STRING, PCSX2_REG_OFFSET(t7), 0, 0, SLPM66390, "SLPM-66390"}},
+    // ピヨたん ～お屋敷潜入大作戦～
+    {0x12396C, {FULL_STRING, PCSX2_REG_OFFSET(a0), 0, 0, 0, "SLPM-55032"}},
+    // Fragrance Tale ～フレグランス テイル～
+    {0x128B7c, {FULL_STRING, PCSX2_REG_OFFSET(a1), 0, 0, SLPS25494, "SLPS-25494"}}, // 也是128b78，但是退让一下
+    {0x4A47A0, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPS-25494"}},
+    // そして僕らは、・・・and he said
+    {0x134A6C, {0, 0, 0, SLPM65971, FSLPM65971, "SLPM-65971"}},
     // Apocripha/0
     {0x1222c8, {FULL_STRING, PCSX2_REG_OFFSET(a0), 0, SLPM65710, 0, "SLPM-65710"}},
     // Angel's Feather −黒の残影−
@@ -2169,7 +2074,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // アラビアンズ・ロスト ～The engagement on desert～
     {0x3A2F70, {DIRECT_READ, 0, 0, 0, SLPM66847, "SLPM-66847"}},
     // INTERLUDE
-    {0x572040, {DIRECT_READ, 0, 0, 0, SLPS25283, "SLPS-25283"}},
+    {0x572040, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPS-25283"}},
     // てんたま -1st Sunny Side-
     {0x1DFD630, {DIRECT_READ, 0, 0, 0, SLPM66352, "SLPS-25298"}},
     // てんたま2wins [限定版]
@@ -2218,6 +2123,8 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x1f1420, {0, PCSX2_REG_OFFSET(a1), 0, 0, SLPM67003, "SLPM-67003"}},
     // サクラ大戦Ⅴ ～さらば愛しき人よ～
     {0x1F6E550, {DIRECT_READ, 0, 0, 0, SLPM67009, "SLPM-67009"}},
+    {0x645CC0, {DIRECT_READ, 0, 0, 0, SLPM67009, "SLPM-67009"}},
+    {0x1F6E790, {DIRECT_READ, 0, 0, 0, SLPM67009, "SLPM-67009"}}, // 不知道为什么地址变成这个了，可能不是很稳定
     // 月は東に日は西に -Operation Sanctuary-
     {0x131890, {0, PCSX2_REG_OFFSET(a1), 0, 0, SLPM65717, "SLPM-65717"}},
     // うたう♪タンブリング・ダイス ～私たち3人、あ・げ・る～
@@ -2291,7 +2198,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 初恋-first kiss- 初回限定版
     {0x2133F8, {0, PCSX2_REG_OFFSET(s4), 0, 0, SLPM66026, "SLPM-66026"}},
     // for Symphony ～with all one's heart～
-    {0x2AFEF0, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPS-25506"}},
+    {0x2AFEF0, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPS-25506"}},
     // ホームメイド ～終の館～ [初回限定版]
     {0x16CBB4, {0, PCSX2_REG_OFFSET(s0), 0, 0, SLPM66052, "SLPM-65962"}},
     // まじかる☆ている ～ちっちゃな魔法使い～ [初回限定版]
@@ -2461,7 +2368,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 終末少女幻想アリスマチック Apocalypse [通常版]
     {0x1BCA7D0, {DIRECT_READ, 0, 0, 0, SLPM66997, "SLPM-66997"}},
     // ほしがりエンプーサ
-    {0x3649D0, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPM-66969"}},
+    {0x3649D0, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPM-66969"}},
     // ほしフル～星の降る街～
     {0x6F0B28, {DIRECT_READ, 0, 0, SLPM66344<0x6F0B28, 0x6F0B5D, 0x6F0B92>, 0, "SLPM-66920"}},
     // H2Oプラス
@@ -2539,9 +2446,9 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // ストライクウィッチーズ あなたとできること [通常版]
     {0x10A948, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(a0), 0, 0, 0, "SLPM-55174"}},
     // 恋姫†夢想 ～ドキッ☆乙女だらけの三国志演義～ [通常版]
-    {0x66C5C0, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPM-55068"}},
+    {0x66C5C0, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPM-55068"}},
     // 真・恋姫†夢想 ～乙女繚乱☆三国志演義～ [通常版]
-    {0xBC9740, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPM-55288"}},
+    {0xBC9740, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPM-55288"}},
     // 神曲奏界ポリフォニカ
     {0x1239C8, {0, PCSX2_REG_OFFSET(s0), 0, 0, SLPM66743, "SLPM-66743"}},
     // 神曲奏界ポリフォニカ 0～4話フルパック
@@ -2582,7 +2489,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 風雨来記
     {0x1FFACA0, {DIRECT_READ, 0, 0, 0, SLPM66458, "SLPM-66458"}},
     // 風雨来記2
-    {0x2AC77C, {0, 0, 0, SLPM66163, 0, "SLPM-66163"}}, //@mills
+    {0x259400, {0, PCSX2_REG_OFFSET(a2), 0, 0, SLPM66163, "SLPM-66163"}},
     // あかね色に染まる坂 ぱられる
     {0x126660, {0, PCSX2_REG_OFFSET(v1), 0, 0, SLPM55006, "SLPM-55006"}},
     // 赤川次郎ミステリー月の光　 ～沈める鐘の殺人～
@@ -2622,7 +2529,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x8DA13A, {DIRECT_READ, 0, 0, 0, SLPS25809, "SLPS-25809"}},
     // 好きなものは好きだからしょうがない！！ -FIRST LIMIT & TARGET†NIGHTS- Sukisho！ Episode ＃01+＃02
     {0x268CE9, {DIRECT_READ, 0, 0, SLPS20394<0x268CE9, 0x268D2A, 0x268D6B, 0x268DAC>, 0, "SLPS-20352"}}, //[ディスク 1]
-    {0x2690EA, {DIRECT_READ, 0, 0, SLPS20394<0x2690EA, 0x26912A, 0x26916B, 0x2691AC>, 0, "SLPS-20353"}}, //[ディスク 2]
+    {0x1010dc, {FULL_STRING, PCSX2_REG_OFFSET(a2), 0, 0, SLPS20353, "SLPS-20353"}},                      //[ディスク 2]
     // 好きなものは好きだからしょうがない！！ -RAIN- Sukisyo！ Episode #03
     {0x2AF161, {DIRECT_READ, 0, 0, SLPS20394<0x2AF161, 0x2AFAA8, 0x2AEFA4, 0x2AEFE5>, 0, "SLPS-20394"}},
     // ドラスティックキラー
@@ -2675,7 +2582,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 猛獣使いと王子様
     {0x16681E0, {DIRECT_READ, 0, 0, 0, FSLPM65997, "SLPM-55264"}},
     // 120円の春
-    {0x1CEAF56, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPM-65843"}},
+    {0x1CEAF56, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPM-65843"}},
     // ゲームになったよ！ドクロちゃん～健康診断大作戦～
     {0x1B9Bbec, {DIRECT_READ, 0, 0, 0, FSLPM65997, "SLPM-66186"}},
     // 地獄少女 澪縁
@@ -2712,20 +2619,23 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x356FB0, {DIRECT_READ | CODEC_UTF8, 0, 0, 0, SLPS25662, "SLPS-25662"}},
     // 今日からマ王！ 眞マ国の休日
     {0x3428D0, {DIRECT_READ | CODEC_UTF8, 0, 0, 0, SLPS25801, "SLPS-25801"}},
+    // 遙かなる時空の中で3
+    {0x24CAE8, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(t7), 0, 0, FSLPM66127, std::vector<const char *>{"SLPM-65834", "SLPM-65849", "SLPM-65850"}}},
+    {0x24CA50, {0, PCSX2_REG_OFFSET(a1), 0, SLPM66127X, FSLPM66127, std::vector<const char *>{"SLPM-65834", "SLPM-65849", "SLPM-65850"}}},
     // 遙かなる時空の中で3 運命の迷宮
     {0x1FD73C, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(t7), 0, 0, FSLPM66127, std::vector<const char *>{"SLPM-66344", "SLPM-66347", "SLPM-66348"}}}, // 开场
     {0x1FD6A0, {0, PCSX2_REG_OFFSET(a1), 0, SLPM66127X, FSLPM66127, std::vector<const char *>{"SLPM-66344", "SLPM-66347", "SLPM-66348"}}},
     // 遙かなる時空の中で3 十六夜記 Harukanaru Toki no Naka de 3 - Izayoiki
-    {0x25882C, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(t7), 0, 0, FSLPM66127, "SLPM-66127"}},
-    {0x258790, {0, PCSX2_REG_OFFSET(a1), 0, SLPM66127X, FSLPM66127, "SLPM-66127"}},
+    {0x25882C, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(t7), 0, 0, FSLPM66127, std::vector<const char *>{"SLPM-66099", "SLPM-66100", "SLPM-66127"}}},
+    {0x258790, {0, PCSX2_REG_OFFSET(a1), 0, SLPM66127X, FSLPM66127, std::vector<const char *>{"SLPM-66099", "SLPM-66100", "SLPM-66127"}}},
     // 遙かなる時空の中で4
     {0x1B043C, {USING_CHAR | DATA_INDIRECT, PCSX2_REG_OFFSET(s1), 0, 0, FSLPM66127, "SLPM-66952"}},
     {0x1B0360, {0, PCSX2_REG_OFFSET(a1), 0, SLPM66127X, FSLPM66127, "SLPM-66952"}},
     // Angel's Feather
     {0x31B880, {DIRECT_READ, 0, 0, SLPS20394<0x31B480, 0x31B880, 0x31BC80, 0x31C080>, 0, std::vector<const char *>{"SLPM-65512", "SLPM-65513"}}},
     // 空色の風琴 ～Remix～
-    {0x1A9238, {DIRECT_READ, 0, 0, 0, SLPM65843, "SLPM-65848"}},
-    {0x10c324, {FULL_STRING, PCSX2_REG_OFFSET(a0), 0, 0, SLPM65843, "SLPM-65848"}},
+    {0x1A9238, {DIRECT_READ, 0, 0, 0, SLPS25395, "SLPM-65848"}},
+    {0x10c324, {FULL_STRING, PCSX2_REG_OFFSET(a0), 0, 0, SLPS25395, "SLPM-65848"}},
 };
 
 extern void pcsx2_load_functions(std::unordered_map<DWORD, emfuncinfo> &m)

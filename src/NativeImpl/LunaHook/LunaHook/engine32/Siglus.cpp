@@ -1606,7 +1606,6 @@ bool InsertSiglusHookZ()
       0x8b, 0x12,
       0x66, 0x89, 0x04, 0x72};
   auto addr = MemDbg::findBytes(bytes, sizeof(bytes), processStartAddress, processStopAddress);
-  ConsoleOutput("SiglusHookZ %p", addr);
   if (!addr)
     return false;
   HookParam hp;
@@ -1748,7 +1747,7 @@ namespace
           return;
         buffer->from(arg->view());
       }
-      void hookafter(hook_context *s, TextBuffer buffer)
+      void hookafter(hook_context *s, TextBuffer buffer, HookParam *)
       {
         auto arg = (TextUnionW *)(type_ == Type1 ? s->ecx : s->stack[1]);
         arg->setText(buffer.viewW());
@@ -1810,7 +1809,7 @@ namespace OtherHook
       buffer->from(vw);
       //           newText = EngineController::instance()->dispatchTextWSTD(oldText, role, sig);
     }
-    void hookafter2(hook_context *s, TextBuffer buffer)
+    void hookafter2(hook_context *s, TextBuffer buffer, HookParam *)
     {
       auto arg = (TextUnionW *)s->stack[0];
       arg->setText(buffer.viewW());
@@ -1881,13 +1880,13 @@ static bool h3_n()
     auto arg = (TextUnionW *)(s->ebp - ebpoff);
     buffer->from(arg->view());
   };
-  hp.embed_fun = [](hook_context *s, TextBuffer buffer)
+  hp.embed_fun = [](hook_context *s, TextBuffer buffer, HookParam *)
   {
     auto arg = (TextUnionW *)(s->ebp - ebpoff);
     arg->setText(buffer.viewW());
   };
   hp.embed_hook_font = F_GetGlyphOutlineW;
-  return NewHook(hp, "EmbedSiglus2_1");
+  return NewHookRetry(hp, "EmbedSiglus2_1");
 }
 static bool h3_t()
 {
@@ -1915,13 +1914,13 @@ static bool h3_t()
     auto arg = (TextUnionW *)s->ecx;
     buffer->from(arg->view());
   };
-  hp.embed_fun = [](hook_context *s, TextBuffer buffer)
+  hp.embed_fun = [](hook_context *s, TextBuffer buffer, HookParam *)
   {
     auto arg = (TextUnionW *)s->ecx;
     arg->setText(buffer.viewW());
   };
   hp.embed_hook_font = F_GetGlyphOutlineW;
-  return NewHook(hp, "EmbedSiglus2");
+  return NewHookRetry(hp, "EmbedSiglus2");
 }
 static bool h3()
 {

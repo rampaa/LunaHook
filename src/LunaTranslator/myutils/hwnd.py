@@ -21,7 +21,9 @@ def clipboard_set_image(p: QImage):
 
 
 @threader
-def grabwindow(app="PNG", callback_origin=None, tocliponly=False, usewgc=False):
+def grabwindow(
+    app="PNG", callback_origin=None, tocliponly=False, usewgc=False, screenshot=False
+):
     tmsp = time.strftime("%Y-%m-%d-%H-%M-%S", time.localtime())
     if tocliponly:
         fname = ""
@@ -59,8 +61,16 @@ def grabwindow(app="PNG", callback_origin=None, tocliponly=False, usewgc=False):
             return
         if tocliponly:
             clipboard_set_image(p)
+            if screenshot:
+                gobject.base.displayinfomessage(
+                    "saved to clipboard", "<msg_info_refresh>"
+                )
             return
         p.save(fn)
+        if screenshot:
+            gobject.base.displayinfomessage(
+                "saved to " + os.path.dirname(fn), "<msg_info_refresh>"
+            )
         if callback_origin:
             callback_origin(os.path.abspath(fn))
         if uid:
@@ -74,11 +84,15 @@ def grabwindow(app="PNG", callback_origin=None, tocliponly=False, usewgc=False):
     if not hwnd:
         return
     hwnd = windows.GetAncestor(hwnd)
-    if not usewgc:
+    if ((not screenshot) and (not usewgc)) or (
+        screenshot and globalconfig["screenshot_method"]["gdi"]
+    ):
         p = safepixmap(NativeUtils.GdiGrabWindow(hwnd))
         callback(p, fname + "_gdi." + app)
     isshit = (not callback_origin) and (not tocliponly)
-    if usewgc or (p.isNull() or isshit):
+    if ((not screenshot) and (usewgc or (p.isNull() or isshit))) or (
+        screenshot and globalconfig["screenshot_method"]["winrt"]
+    ):
 
         @threader
         def _():
@@ -87,10 +101,9 @@ def grabwindow(app="PNG", callback_origin=None, tocliponly=False, usewgc=False):
 
         _()
 
-    if usewgc or isshit:
-        gobject.base.displayinfomessage(
-            "saved to " + os.path.dirname(fname), "<msg_info_refresh>"
-        )
+    if ((not screenshot) and (usewgc or isshit)) or (
+        screenshot and globalconfig["screenshot_method"]["magpie"]
+    ):
 
         hwnd = windows.FindWindow(
             "Window_Magpie_967EB565-6F73-4E94-AE53-00CC42592A22", None
@@ -103,8 +116,6 @@ def grabwindow(app="PNG", callback_origin=None, tocliponly=False, usewgc=False):
                 callback(p, fname + "_winrt_magpie." + app)
 
             _()
-    elif tocliponly:
-        gobject.base.displayinfomessage("saved to clipboard", "<msg_info_refresh>")
 
 
 def getcurrexe():
@@ -214,19 +225,22 @@ def safepixmap(bs):
     return pixmap
 
 
-def subprochiderun(cmd, cwd=None, encoding="utf8") -> subprocess.CompletedProcess:
+def subprochiderun(
+    cmd, cwd=None, encoding="utf8", run=True, env=None
+) -> "subprocess.CompletedProcess|subprocess.Popen":
 
     startupinfo = subprocess.STARTUPINFO()
     startupinfo.dwFlags |= subprocess.STARTF_USESHOWWINDOW
     startupinfo.wShowWindow = subprocess.SW_HIDE
 
-    ss = subprocess.run(
+    ss = (subprocess.run if run else subprocess.Popen)(
         cmd,
         cwd=cwd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
         startupinfo=startupinfo,
         encoding=encoding,
+        env=env,
     )
 
     return ss

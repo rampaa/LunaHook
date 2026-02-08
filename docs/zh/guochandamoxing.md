@@ -63,7 +63,7 @@
 
     对于Gemini平台，会自动将选项映射为Gemini的`thinkingBudget`，映射规则为：
     
-    minimal->0(停用思考，但对于Gemini-2.5-Pro模型不适用), low->512, medium->-1（开启动态思维）, high->24576。
+    none/minimal->0(停用思考，但对于Gemini-2.5-Pro模型不适用), low->512, medium->-1（开启动态思维）, high/xhigh->24576。
 
 1. #### 其他参数
 
@@ -82,6 +82,10 @@
 == Gemini
 
 **API Key** https://aistudio.google.com/app/apikey
+
+== Nvidia
+
+**API Key** https://build.nvidia.com/explore/discover
 
 == claude
 
@@ -201,7 +205,7 @@
 
 也可以使用[new-api](https://github.com/QuantumNous/new-api)等API中继工具，更方便地聚合管理多种大模型平台模型和多个密钥。
 
-使用方法可以参考[此文章](https://www.newapi.ai/apps/luna-translator/)
+使用方法可以参考[此文章](https://www.newapi.ai/zh/docs/apps/luna-translator)
 
 ### 离线部署模型
 

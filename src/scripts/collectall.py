@@ -1,7 +1,29 @@
-import shutil, os
-import platform
-import sys
+import shutil, os, base64
+import sys, re, json
 from importanalysis import importanalysis
+import urllib.request
+import urllib.error
+
+
+def get_json(url: str, headers=None):
+    if headers is None:
+        headers = {}
+
+    # 设置默认的User-Agent（很多API需要）
+    headers.setdefault("User-Agent", "Mozilla/5.0")
+
+    req = urllib.request.Request(url, headers=headers)
+    try:
+        with urllib.request.urlopen(req) as response:
+            # 读取响应内容
+            data = response.read()
+            # 解码为字符串
+            text = data.decode("utf-8")
+            # 解析JSON
+            return json.loads(text)
+    except:
+        return {}
+
 
 arch = sys.argv[1]
 target = sys.argv[2]
@@ -12,9 +34,8 @@ if target == "winxp":
     os.rename("py3.4_pyqt5.5.1/Python34", "runtime")
     pyrt = "runtime"
 else:
-    pyrt = f"../build/pyrt_{arch}_{target}/runtime"
-launch = f"../src/NativeImpl/builds/_{arch}"
-launch += f"_{target}"
+    pyrt = f"pyrt/runtime"
+launch = f"NativeImpl/builds/_{arch}_{target}"
 targetdir = rf"build\LunaTranslator_{arch}_{target}"
 
 if arch == "x86":
@@ -42,8 +63,8 @@ def copycheck(src, tgt):
     shutil.copy(src, tgt)
 
 
-copycheck(os.path.join(launch, "LunaTranslator.exe"), targetdir)
-copycheck(os.path.join(launch, "LunaTranslator_admin.exe"), targetdir)
+# copycheck(os.path.join(launch, "LunaTranslator.exe"), targetdir)
+# copycheck(os.path.join(launch, "LunaTranslator_admin.exe"), targetdir)
 with open(os.path.join(targetdir, "LunaTranslator_debug.bat"), "w") as ff:
     ff.write(
         r""".\LunaTranslator.exe
@@ -55,20 +76,37 @@ copycheck("./LunaTranslator", targetdir)
 copycheck(r".\files", targetdir)
 copycheck(pyrt, targetdir + "/files")
 if target == "win10":
-    runtimedir = "runtime31264"
+    runtimedir = "runtime3.13-64"
 elif target == "winxp":
-    runtimedir = "runtime3432"
+    runtimedir = "runtime3.4-32"
 elif arch == "x64":
-    runtimedir = "runtime3764"
+    runtimedir = "runtime3.7-64"
 else:
-    runtimedir = "runtime3732"
+    runtimedir = "runtime3.7-32"
 os.rename(targetdir + "/files/runtime", targetdir + "/files/" + runtimedir)
 try:
     shutil.rmtree(rf"{targetdir}\files\{baddll}")
 except:
     pass
-shutil.copy(r"..\LICENSE", targetdir)
 
+os.makedirs(os.path.join(targetdir, "LICENSES"))
+shutil.copy(
+    r"..\LICENSE", os.path.join(targetdir, "LICENSES", "LICENSE.LunaTranslator")
+)
+with open("LunaTranslator/gui/setting/about.py", "r", encoding="utf8") as ff:
+    for _ in re.findall(r'makelink\(".*?"\)', ff.read()):
+        _js: dict[str, str] = get_json(
+            rf"https://api.github.com/repos/{_[10:-2]}/license"
+        )
+        content = _js.get("content")
+        if content:
+            content = base64.b64decode(content.encode()).decode()
+            with open(
+                os.path.join(targetdir, "LICENSES", "LICENSE." + _[10:-2].replace("/", ".")),
+                "w",
+                encoding="utf8 ",
+            ) as ff:
+                ff.write(content)
 collect = []
 for _dir, _, fs in os.walk(targetdir):
     for f in fs:
@@ -82,7 +120,7 @@ for f in collect:
         if f.endswith("Magpie.Core.exe"):
             continue
         print(f)
-        imports = importanalysis(f)
+        imports = importanalysis(f)["imports"]
         print(f, imports)
         if len(imports) == 0:
             continue
@@ -125,13 +163,23 @@ for f in collect:
         with open(f, "wb") as ff:
             ff.write(bs)
 
+
+os.system(f"python scripts/createsigexe.py {arch} {target} {targetdir}")
+copycheck(f"{launch}/LunaTranslator.exe", targetdir)
+copycheck(f"{launch}/LunaTranslator_admin.exe", targetdir)
+
+
 target = os.path.basename(targetdir)
 os.chdir(os.path.dirname(targetdir))
 if os.path.exists(rf"{target}.zip"):
     os.remove(rf"{target}.zip")
 if os.path.exists(rf"{target}.7z"):
     os.remove(rf"{target}.7z")
-os.system(rf'"C:\Program Files\7-Zip\7z.exe" a -m0=Deflate -mx9 {target}.zip {target}')
+
+if 0:
+    os.system(
+        rf'"C:\Program Files\7-Zip\7z.exe" a -m0=Deflate -mx9 {target}.zip {target}'
+    )
 if 0:
     os.system(rf'"C:\Program Files\7-Zip\7z.exe" a -m0=LZMA2 -mx9 {target}.7z {target}')
     with open(r"C:\Program Files\7-Zip\7z.sfx", "rb") as ff:

@@ -64,7 +64,7 @@ However, sometimes you may want to use multiple different API interface addresse
 
     For the Gemini platform, this option will automatically map to Gemini's `thinkingBudget`. The mapping rules are as follows:  
     
-    minimal -> 0 (disable thinking, but not applicable to the Gemini-2.5-Pro model), low -> 512, medium -> -1 (enable dynamic thinking), high -> 24576.
+    none/minimal -> 0 (disable thinking, but not applicable to the Gemini-2.5-Pro model), low -> 512, medium -> -1 (enable dynamic thinking), high/xhigh -> 24576.
 
 1. #### Other Parameters  
 
@@ -83,6 +83,10 @@ However, sometimes you may want to use multiple different API interface addresse
 == Gemini
 
 **API Key** https://aistudio.google.com/app/apikey
+
+== Nvidia
+
+**API Key** https://build.nvidia.com/explore/discover
 
 == Claude
 
@@ -197,7 +201,7 @@ Replace `{endpoint}` and `{deployName}` with your endpoint and deployName.
 
 You can also use API relay tools such as [new-api](https://github.com/QuantumNous/new-api) to more conveniently aggregate and manage multiple large model platform models and multiple keys.
 
-For usage methods, you can refer to [this article](https://www.newapi.ai/apps/luna-translator/).
+For usage methods, you can refer to [this article](https://www.newapi.ai/en/docs/apps/luna-translator).
 
 ### Offline Deployment Model
 

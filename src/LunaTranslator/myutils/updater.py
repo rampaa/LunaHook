@@ -3,6 +3,7 @@ from myutils.config import globalconfig, static_data, _TR
 from gobject import runtime_for_xp, runtime_bit_64, runtime_for_win10, runtimedir
 from myutils.wrapper import threader, tryprint, trypass
 from myutils.hwnd import getcurrexe
+from myutils.utils import format_bytes
 import requests, base64
 import shutil, gobject
 from myutils.proxy import getproxy
@@ -43,8 +44,15 @@ def tryqueryfromhost():
         @trypass
         def __(i, main_server, proxy):
 
+            if runtime_for_xp:
+                target = "winxp"
+            elif runtime_for_win10:
+                target = "win10"
+            else:
+                target = "win7"
             res = requests.get(
                 "{main_server}/version".format(main_server=main_server),
+                params={"arch": ("x86", "x64")[runtime_bit_64], "target": target},
                 verify=False,
                 proxies=proxy,
             )
@@ -57,23 +65,17 @@ def tryqueryfromhost():
             __(i, main_server, None)
     wait.wait()
     gobject.serverindex = results[0][0]
-    return results[0][1]["version"], results[0][1]
+    return results[0][1]
 
 
 def trygetupdate():
     try:
-        version, links = tryqueryfromhost()
+        result = tryqueryfromhost()
+        version, link, sha256 = result["version"], result["link"], result["sha256"]
+        return version, link, sha256
     except:
         print_exc()
         return None
-    bit = ("x86", "x64")[runtime_bit_64]
-    if runtime_for_xp:
-        bit += "_winxp"
-    elif runtime_for_win10:
-        bit += "_win10"
-    else:
-        bit += "_win7"
-    return version, links[bit], links.get("sha256", {}).get(bit, None)
 
 
 def doupdate():
@@ -140,20 +142,19 @@ def updatemethod(urls: "tuple[str, str]"):
         r = requests.get(url, stream=True, verify=False, proxies=getproxy())
         size = int(r.headers["Content-Length"])
         file_size = 0
+        asize = format_bytes(size)
         for i in r.iter_content(chunk_size=1024 * 32):
             if check_interrupt():
                 return
             if not i:
                 continue
             file.write(i)
-            thislen = len(i)
-            file_size += thislen
+            file_size += len(i)
 
             prg = int(10000 * file_size / size)
             prg100 = prg / 100
-            sz = int(1000 * (int(size / 1024) / 1024)) / 1000
             gobject.base.progresssignal4.emit(
-                _TR("总大小_{} MB _进度_{:0.2f}%").format(sz, prg100),
+                _TR("总大小_{} _进度_{:0.2f}%").format(asize, prg100),
                 prg,
             )
 

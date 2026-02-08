@@ -1,5 +1,5 @@
 import base64, uuid, gobject
-from cishu.cishubase import DictTree
+from cishu.cishubase import DictTree, DictionaryRoot
 from traceback import print_exc
 from myutils.audioplayer import bass_code_cast
 import json, os, re
@@ -7,6 +7,7 @@ from cishu.mdict_.readmdict import MDX, MDD, MDict
 import hashlib, sqlite3, functools
 import NativeUtils
 from myutils.mimehelper import query_mime
+from myutils.config import _TR
 
 
 class IndexBuilder(object):
@@ -49,6 +50,7 @@ class IndexBuilder(object):
             + hashlib.md5(_filename.encode("utf8")).hexdigest()
         )
         _targetfilenamebase = gobject.getcachedir("mdict/index/" + _mdxmd5)
+        self.mdxmd5 = _mdxmd5
         self._mdx_db = _targetfilenamebase + ".mdx.v3.db"
         # make index anyway
 
@@ -157,7 +159,7 @@ class IndexBuilder(object):
             lookup_result_list.append(self.get_mdx_by_index(index))
         return lookup_result_list
 
-    def mdd_lookup(self, keyword, ignorecase=None):
+    def mdd_lookup(self, keyword, ignorecase=True):
         lookup_result_list = []
         for i in range(len(self._mdict_mdds)):
             indexes = self.lookup_indexes(self._mdd_dbs[i], keyword, ignorecase)
@@ -279,6 +281,9 @@ class mdict(cishubase):
         except:
             self.extraconf = {}
         self.checkpath()
+        self.writeconfig()
+
+    def writeconfig(self):
         try:
             with open(
                 gobject.getconfig("mdict_config.json"), "w", encoding="utf8"
@@ -350,7 +355,7 @@ class mdict(cishubase):
 
     def subcallback(
         self,
-        index,
+        index: IndexBuilder,
         fn,
         base,
         audiob64vals: dict,
@@ -383,6 +388,7 @@ class mdict(cishubase):
                 file_content.decode("utf8", errors="ignore"), divclass
             )
             if css:
+                css = self.__parse_css_fontface_url_local(index, css)
                 csscollect[url] = css
                 return None
             else:
@@ -397,6 +403,26 @@ class mdict(cishubase):
             return matchall.replace(url, varname)
 
         return matchall
+
+    def __parse_css_fontface_url_local(self, index: IndexBuilder, css: str):
+        def replacer(match: re.Match):
+            _ = match.groups()[0]
+            _font = self.parse_url_in_mdd(index, _)
+            if not _font:
+                if ("#" not in _) and ("?" not in _):
+                    return 'url("' + match.group() + '")'
+                _ = re.sub(r"[\?#](.*?)$", "", _)
+                _font = self.parse_url_in_mdd(index, _)
+            if not _font:
+                return 'url("' + match.group() + '")'
+
+            f = gobject.getcachedir(os.path.join("mdict/index", index.mdxmd5, _))
+            with open(f, "wb") as ff:
+                ff.write(_font)
+            return 'url("' + f.replace("\\", "/") + '")'
+
+        css = re.sub(r'url\("(.*?)"\)', replacer, css)
+        return css
 
     def repairtarget(
         self,
@@ -721,11 +747,21 @@ function safe_mdict_search_word(word){
         if len(self.builders) == 0:
             return
 
-        class everydict(DictTree):
+        class everydict(DictionaryRoot):
             def __init__(self, ref: "mdict", f, index: IndexBuilder) -> None:
                 self.f = f
                 self.index = index
                 self.ref = ref
+
+            def tips(self):
+                return (
+                    self.text()
+                    + "\n"
+                    + self.f
+                    + "\n"
+                    + _TR("优先级")
+                    + str(self.ref.getpriority(self.f))
+                )
 
             def text(self):
                 return self.ref.gettitle(self.f, self.index)
@@ -733,11 +769,50 @@ function safe_mdict_search_word(word){
             def childrens(self) -> list:
                 return sorted(list(set(self.index.get_mdx_keys("*"))))
 
+            def menus(self, menu):
+                from gui.dynalang import LAction
+
+                prio = LAction("调整优先级", menu)
+                prio.triggered.connect(functools.partial(self.__callback2, menu))
+                menu.addAction(prio)
+                if self.ref.config["stylehv"] == 1:
+                    FoldFlow = LAction("默认折叠", menu)
+                    FoldFlow.setCheckable(True)
+                    FoldFlow.setChecked(self.ref.getFoldFlow(self.f))
+                    FoldFlow.triggered.connect(
+                        functools.partial(self.__callback, FoldFlow)
+                    )
+                    menu.addAction(FoldFlow)
+
+            def __callback2(self, menu):
+                from gui.usefulwidget import MyInputDialog
+                from gui.RichMessageBox import RichMessageBox
+                from myutils.utils import stringfyerror
+
+                newp = MyInputDialog(
+                    menu, "调整优先级", "调整为", str(self.ref.getpriority(self.f))
+                )
+                if not newp:
+                    return
+                try:
+                    self.ref.extraconf[self.f]["priority"] = int(newp)
+                    self.ref.writeconfig()
+                except Exception as e:
+                    err = stringfyerror(e)
+                    RichMessageBox(menu, _TR("错误"), err)
+
+            def __callback(self, ac):
+                from gui.dynalang import LAction
+
+                ac: LAction = ac
+                self.ref.extraconf[self.f]["FoldFlow"] = ac.isChecked()
+                self.ref.writeconfig()
+
         class DictTreeRoot(DictTree):
             def __init__(self, ref: "mdict") -> None:
                 self.ref = ref
 
-            def childrens(self) -> "list[DictTree]":
+            def childrens(self) -> "list[everydict]":
                 saves = []
                 for f, index in self.ref.builders:
                     saves.append(

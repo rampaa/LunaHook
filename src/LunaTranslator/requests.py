@@ -5,23 +5,22 @@ from functools import partial
 from myutils.config import globalconfig
 from network.structures import CaseInsensitiveDict
 
-default_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+default_UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.7559.60 Safari/537.36"
 
 default_timeout = 10
 
 
-class RequestException(Exception):
-    def __init__(self, *args):
-        super().__init__(*args)
-        self.proxy: str = None
+class exceptions:
+    class RequestException(Exception):
+        def __init__(self, *args):
+            super().__init__(*args)
+            self.proxy: str = None
 
+    class Timeout(RequestException):
+        pass
 
-class Timeout(RequestException):
-    pass
-
-
-class HTTPError(RequestException):
-    pass
+    class HTTPError(RequestException):
+        pass
 
 
 CONTENT_CHUNK_SIZE = 10 * 1024
@@ -53,7 +52,7 @@ class Response:
     @content.setter
     def content(self, c):
         if self.stream:
-            raise RequestException()
+            raise exceptions.RequestException()
         self.__content = c
 
     @property
@@ -61,7 +60,9 @@ class Response:
         try:
             return self.content.decode(self.charset)
         except:
-            raise RequestException("unenable to decode with {}".format(self.charset))
+            raise exceptions.RequestException(
+                "unenable to decode with {}".format(self.charset)
+            )
 
     @property
     def charset(self):
@@ -70,7 +71,7 @@ class Response:
         charset = m.group(1) if m else "utf-8"
         return charset
 
-    def json(self):
+    def json(self) -> "dict|list|str":
         return json.loads(self.text)
 
     def stream_decode_response_unicode(self, iterator):
@@ -86,10 +87,10 @@ class Response:
 
     def iter_content(self, chunk_size=1, decode_unicode=False):
         if not self.stream:
-            raise RequestException()
+            raise exceptions.RequestException()
 
         if not self.iter_once:
-            raise RequestException()
+            raise exceptions.RequestException()
         self.iter_once = False
 
         def __generate():
@@ -145,7 +146,7 @@ class Response:
             http_error_msg = "{code} {which} Error: {text} for url: {url}".format(
                 code=self.status_code, which=which, text=self.reason, url=self.url
             )
-            raise HTTPError(http_error_msg)
+            raise exceptions.HTTPError(http_error_msg)
 
 
 class Requester_common:
@@ -171,7 +172,8 @@ class Requester_common:
 
     def _parseheader(self, headers: CaseInsensitiveDict, cookies: dict):
         _x = []
-
+        if headers is None:
+            headers = {}
         if cookies:
             cookie = self._parsecookie(cookies)
             headers.update({"Cookie": cookie})
@@ -242,7 +244,7 @@ class _Functions:
         scheme, server, path, query, frag = urlsplit(url)
         path = quote(path, safe=":/=")
         if scheme not in ["https", "http"]:
-            raise RequestException(
+            raise exceptions.RequestException(
                 "unknown scheme {} for invalid url {}".format(scheme, url)
             )
         spl = server.split(":")
@@ -256,7 +258,7 @@ class _Functions:
             else:
                 port = 80
         else:
-            raise RequestException("invalid url " + url)
+            raise exceptions.RequestException("invalid url " + url)
         query = urlencode(parse_qsl(query), doseq=True)
         if param:
             param = _Functions._encode_params(param)
@@ -414,7 +416,9 @@ class Session:
             )
         scheme, server, port, param, url = _Functions._parseurl(url, params)
 
-        if server == "127.0.0.1":
+        if server in ("0.0.0.0",):
+            server = "127.0.0.1"
+        if server in ("127.0.0.1", "localhost"):
             # libcurl在本地地址走代理时有时会谜之502
             proxies = None
         databytes = b""
@@ -461,7 +465,7 @@ class Session:
                 timeout,
                 allow_redirects,
             )
-        except RequestException as e:
+        except exceptions.RequestException as e:
             e.proxy = proxy
             raise e
 

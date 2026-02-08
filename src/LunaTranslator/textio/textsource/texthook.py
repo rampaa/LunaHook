@@ -6,6 +6,7 @@ import zhconv, functools
 from myutils.config import (
     globalconfig,
     savehook_new_data,
+    dynamiclink,
     findgameuidofpath,
     _TR,
 )
@@ -33,7 +34,7 @@ from ctypes import (
     c_uint8,
     c_uint,
     c_char,
-    cast,
+    c_float,
 )
 from ctypes.wintypes import DWORD, LPCWSTR
 
@@ -214,6 +215,8 @@ class texthook(basetext):
             c_uint32,
             c_bool,
             c_bool,
+            c_bool,
+            c_float,
         )
         self.Luna_CheckIsUsingEmbed = LunaHost.Luna_CheckIsUsingEmbed
         self.Luna_CheckIsUsingEmbed.argtypes = (ThreadParam,)
@@ -238,7 +241,6 @@ class texthook(basetext):
         ]
         self.keepref += procs
         self.Luna_Start(*procs)
-        self.setsettings()
         self.setlang()
 
     def i18nQueryCallback(self, querytext: str):
@@ -327,6 +329,7 @@ class texthook(basetext):
             self.waitend(pid)
         gobject.base.hwnd = hwnd
         self.gameuid = gameuid
+        self.setsettings()
         self.detachall()
         _filename, _ = os.path.splitext(os.path.basename(gamepath))
         sqlitef = gobject.gettranslationrecorddir(
@@ -371,17 +374,25 @@ class texthook(basetext):
     def start_unsafe(self, pids):
         _ = checkintegrity()
         if _:
-            gobject.base.RichMessageBox.emit(_)
-            return
+            raise Exception(_[1])
         injectpids = []
         for pid in pids:
             self.Luna_ConnectProcess(pid)
             if self.Luna_CheckIfNeedInject(pid):
                 injectpids.append(pid)
-        if len(injectpids):
-            arch = ["32", "64"][self.is64bit]
-            dll = os.path.abspath("files/LunaHook/LunaHook{}.dll".format(arch))
-            self.injectdll(injectpids, arch, dll)
+        if not injectpids:
+            return
+        gobject.base.translation_ui.showMarkDownSig.emit(
+            _TR(
+                "正在等待DLL注入到游戏中……\n如果等待时间过长，可能是被杀毒软件拦截，请自行检查相关设置。"
+            )
+            + "\n[{}]({})".format(
+                _TR("说明"), dynamiclink("README.html#anchor-waitdll", docs=True)
+            )
+        )
+        arch = ["32", "64"][self.is64bit]
+        dll = os.path.abspath("files/LunaHook/LunaHook{}.dll".format(arch))
+        self.injectdll(injectpids, arch, dll)
 
     def injectdll(self, injectpids, bit, dll):
 
@@ -539,6 +550,8 @@ class texthook(basetext):
                 self.embedconfig["displaymode"],
                 True,
                 self.embedconfig["clearText"],
+                self.embedconfig["changefontsize_use"],
+                self.embedconfig["changefontsize"],
             )
 
     def onremovehook(self, hc, hn: bytes, tp):
@@ -587,6 +600,7 @@ class texthook(basetext):
         self.Luna_ResetLang()
 
     def setsettings(self):
+        # 这个是游戏相关的设置，等设置gameuid以后再进行
         self.Luna_Settings(
             self.config["textthreaddelay"],
             False,  # 不使用内置去重

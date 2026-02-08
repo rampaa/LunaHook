@@ -9,7 +9,23 @@ if not rootDir:
 else:
     rootDir = os.path.abspath(rootDir)
 rootthisfiledir = rootDir
+
+
+absthisfile = os.path.join(rootthisfiledir, os.path.basename(__file__))
+
 rootDir = os.path.abspath(os.path.join(rootDir, ".."))
+
+originmakedirs = os.makedirs
+
+
+def fuckmakedirs(*a, **kw):
+    try:
+        originmakedirs(*a, **kw)
+    except:
+        pass
+
+
+os.makedirs = fuckmakedirs
 
 
 def fuckmove(src, tgt):
@@ -20,7 +36,7 @@ def fuckmove(src, tgt):
         try:
             shutil.copy(src, tgt)
         except:
-            shutil.copytree(src, tgt, dirs_exist_ok=True)
+            shutil.copytree(src, tgt)
 
 
 pluginDirs = ["DLL32", "DLL64"]
@@ -28,11 +44,26 @@ pluginDirs = ["DLL32", "DLL64"]
 localeEmulatorFile = "https://github.com/xupefei/Locale-Emulator/releases/download/v2.5.0.1/Locale.Emulator.2.5.0.1.zip"
 LocaleRe = "https://github.com/InWILL/Locale_Remulator/releases/download/v1.6.0/Locale_Remulator.1.6.0.zip"
 
+curlFile32xp = "https://web.archive.org/web/20220101212640if_/https://curl.se/windows/dl-7.80.0/curl-7.80.0-win32-mingw.zip"  # "https://github.com/HIllya51/LunaTranslator/releases/latest/download/LunaTranslator_x86_winxp.zip"  #
 curlFile32 = "https://curl.se/windows/dl-8.8.0_3/curl-8.8.0_3-win32-mingw.zip"
-curlFile32xp = "https://web.archive.org/web/20220101212640if_/https://curl.se/windows/dl-7.80.0/curl-7.80.0-win32-mingw.zip"
 curlFile64 = "https://curl.se/windows/dl-8.8.0_3/curl-8.8.0_3-win64-mingw.zip"
 
 availableLocales = ["cht", "en", "ja", "ko", "ru", "zh"]
+
+myfiles = [
+    "files/DLL32/CVUtils.dll",
+    "files/DLL64/CVUtils.dll",
+    "files/DLL32/NativeUtils.dll",
+    "files/DLL64/NativeUtils.dll",
+    "files/LunaHook/LunaHook32.dll",
+    "files/LunaHook/LunaHook64.dll",
+    "files/LunaHook/LunaHost32.dll",
+    "files/LunaHook/LunaHost64.dll",
+    "files/shareddllproxy32.exe",
+    "files/shareddllproxy64.exe",
+    "LunaTranslator.exe",
+    "LunaTranslator_admin.exe",
+]
 
 
 def createPluginDirs():
@@ -77,7 +108,7 @@ def downloadlr():
     fn = os.path.splitext(base)[0]
     subprocess.run(f"7z x -y {base}")
     os.chdir(rootDir)
-    os.makedirs("files/Locale/Locale_Remulator", exist_ok=True)
+    os.makedirs("files/Locale/Locale_Remulator")
 
     for f in [
         "LRHookx64.dll",
@@ -109,10 +140,7 @@ def downloadLocaleEmulator():
         "LECommonLibrary.dll",
     ]:
         os.chdir(rootDir)
-        os.makedirs(
-            "files/Locale/Locale.Emulator",
-            exist_ok=True,
-        )
+        os.makedirs("files/Locale/Locale.Emulator")
         fuckmove(
             os.path.join("scripts/temp/LocaleEmulator", f),
             "files/Locale/Locale.Emulator",
@@ -128,17 +156,9 @@ def downloadNtlea():
     subprocess.run(f"7z x -y {ntleaFile.split('/')[-1]} -ontlea")
 
     os.chdir(rootDir)
-    os.makedirs("files/Locale/ntleas046_x64", exist_ok=True)
-    shutil.copytree(
-        "scripts/temp/ntlea/x86",
-        "files/Locale/ntleas046_x64/x86",
-        dirs_exist_ok=True,
-    )
-    shutil.copytree(
-        "scripts/temp/ntlea/x64",
-        "files/Locale/ntleas046_x64/x64",
-        dirs_exist_ok=True,
-    )
+    os.makedirs("files/Locale/ntleas046_x64")
+    shutil.copytree("scripts/temp/ntlea/x86", "files/Locale/ntleas046_x64/x86")
+    shutil.copytree("scripts/temp/ntlea/x64", "files/Locale/ntleas046_x64/x64")
 
 
 def downloadCurl(target):
@@ -148,7 +168,11 @@ def downloadCurl(target):
         subprocess.run(f"7z x -y {curlFile32xp.split('/')[-1]}")
         os.chdir(rootDir)
         outputDirName32 = curlFile32xp.split("/")[-1].replace(".zip", "")
-        fuckmove(f"scripts/temp/{outputDirName32}/bin/libcurl.dll", "files/DLL32")
+        # fuckmove(f"scripts/temp/{outputDirName32}/bin/libcurl.dll", "files/DLL32")
+        for _dir, _, _fs in os.walk(f"scripts/temp/{outputDirName32}"):
+            for _f in _fs:
+                if _f == "libcurl.dll":
+                    shutil.move(os.path.join(_dir, _f), "files/DLL32")
         return
     os.chdir(f"{rootDir}/scripts/temp")
     subprocess.run(f"curl -C - -LO {curlFile32}")
@@ -169,7 +193,7 @@ def downloadOCRModel():
     link = "https://lunatranslator.org/r2/luna/ocr_models_v5/jazhchten.zip"
     os.chdir("ocrmodel")
     __ = hashlib.md5(link.encode()).hexdigest()
-    os.makedirs(__, exist_ok=True)
+    os.makedirs(__)
     os.chdir(__)
     subprocess.run(f"curl -C - -LO {link}")
     subprocess.run(f"7z x -y jazhchten.zip")
@@ -181,7 +205,7 @@ def downloadOCRModel():
     os.chdir(rootDir)
 
 
-def buildhook(arch, target):
+def buildhook(arch, target, hookonly=False):
 
     os.chdir("NativeImpl/LunaHook")
     archA = ("win32", "x64")[arch == "x64"]
@@ -199,6 +223,8 @@ def buildhook(arch, target):
     subprocess.run(
         f"cmake --build ./build/{arch}_{target}_2 --config Release --target ALL_BUILD -j {os.cpu_count()}"
     )
+    if hookonly:
+        return
     if target != "win10":
         config += " -DUSE_VC_LTL=ON "
     subprocess.run(
@@ -207,14 +233,9 @@ def buildhook(arch, target):
     subprocess.run(
         f"cmake --build ./build/{arch}_{target}_1 --config Release --target ALL_BUILD -j {os.cpu_count()}"
     )
-    release = os.path.join("builds", os.listdir("builds")[0])
-    os.makedirs("builds/Release", exist_ok=True)
-    for f in os.listdir(release):
-        shutil.move(os.path.join(release, f), "builds/Release")
-    shutil.rmtree(release)
 
 
-def buildPlugins(arch, target):
+def buildPlugins(arch, target, configx="", sexe=False):
     os.chdir(rootDir + "/NativeImpl")
     archA = ("win32", "x64")[arch == "x64"]
     if target == "win10":
@@ -230,6 +251,9 @@ def buildPlugins(arch, target):
     if arch == "x86" and target == "win10":
         # 对于64位会使用自带的vcrt，win7/xp会静态编译，仅win10 shareddllproxy32这个文件可能会缺少vcrt，因此把它也静态编译以避免无法运行导致注入失败。
         config += " -DSTATIC_FORCE=ON"
+    config += configx
+    if sexe:
+        config += " -DBUILD_S_EXE_ONLY=ON"
     subprocess.run(
         f'cmake {config} ./CMakeLists.txt -G "{vsver}" -A {archA} -T {Tool} -B ./build/{arch}_{target} {sysver}'
     )
@@ -242,35 +266,14 @@ def buildPlugins(arch, target):
             ff = os.path.join(_dir, _f)
             if os.path.splitext(ff)[1].lower() not in (".dll", ".exe"):
                 os.remove(ff)
-
-
-def downloadbass():
-
-    for link in (
-        "https://www.un4seen.com/files/bass24.zip",
-        "https://www.un4seen.com/files/z/2/bass_spx24.zip",
-        "https://www.un4seen.com/files/z/2/bass_aac24.zip",
-        "https://www.un4seen.com/files/bassopus24.zip",
-        "https://www.un4seen.com/files/bassenc24.zip",
-        "https://www.un4seen.com/files/bassenc_mp324.zip",
-        "https://www.un4seen.com/files/bassenc_opus24.zip",
-    ):
-        os.chdir(f"{rootDir}/scripts/temp")
-        name = link.split("/")[-1]
-        d = name.split(".")[0]
-        subprocess.run("curl -C - -LO " + link)
-        subprocess.run(f"7z x -y {name} -o{d}")
-        os.chdir(rootDir)
-        fuckmove(f"scripts/temp/{d}/{d[:-2]}.dll", "files/DLL32")
-        fuckmove(f"scripts/temp/{d}/x64/{d[:-2]}.dll", "files/DLL64")
+    os.chdir(rootDir)
 
 
 def downloadalls(target):
     os.chdir(rootDir)
-    os.makedirs("scripts/temp", exist_ok=True)
+    os.makedirs("scripts/temp")
     createPluginDirs()
     downloadNtlea()
-    downloadbass()
     downloadCurl(target)
     downloadLocaleEmulator()
     downloadlr()
@@ -296,9 +299,32 @@ if __name__ == "__main__":
             print("version=" + versionstring)
             exit()
     elif sys.argv[1] == "cpp":
-        buildPlugins(sys.argv[2], sys.argv[3])
+        if sys.argv[-1] != "0":
+            argv = sys.argv.copy()
+            argv.append("0")
+            argv[0] = absthisfile
+
+            argv[2] = "x86"
+            argv.insert(len(argv) - 1, str(int(argv[2] != sys.argv[2])))
+            subprocess.run([sys.executable, *argv])
+            argv[2] = "x64"
+            argv[4] = str(int(argv[2] != sys.argv[2]))
+            subprocess.run([sys.executable, *argv])
+            exit(0)
+        buildPlugins(sys.argv[2], sys.argv[3], sexe=int(sys.argv[4]))
     elif sys.argv[1] == "hook":
-        buildhook(sys.argv[2], sys.argv[3])
+        if sys.argv[-1] != "0":
+            argv = sys.argv.copy()
+            argv.append("0")
+            argv[0] = absthisfile
+            argv[2] = "x86"
+            argv.insert(len(argv) - 1, str(int(argv[2] != sys.argv[2])))
+            subprocess.run([sys.executable, *argv])
+            argv[2] = "x64"
+            argv[4] = str(int(argv[2] != sys.argv[2]))
+            subprocess.run([sys.executable, *argv])
+            exit(0)
+        buildhook(sys.argv[2], sys.argv[3], hookonly=int(sys.argv[4]))
     elif sys.argv[1] == "pyrt":
         arch = sys.argv[2]
         pythonversion = sys.argv[3]
@@ -326,43 +352,47 @@ if __name__ == "__main__":
         downloadalls(target)
 
         os.chdir(rootDir)
-        if target == "winxp":
-            shutil.copytree("../build/cpp_x86_winxp", "NativeImpl/builds", dirs_exist_ok=True)
-            shutil.copytree("../build/cpp_x64_win7", "NativeImpl/builds", dirs_exist_ok=True)
-            shutil.copytree(
-                "../build/hook_x86_winxp", "files/LunaHook", dirs_exist_ok=True
-            )
-            shutil.copytree(
-                "../build/hook_x64_win7", "files/LunaHook", dirs_exist_ok=True
-            )
-            os.remove("files/LunaHook/LunaHost64.dll")
-            os.makedirs("files/DLL32", exist_ok=True)
-            shutil.copy("NativeImpl/builds/_x86_winxp/shareddllproxy32.exe", "files")
-            shutil.copy("NativeImpl/builds/_x64_win7/shareddllproxy64.exe", "files")
-            os.system(f"robocopy NativeImpl/builds/_x86_winxp files/DLL32 *.dll")
-            os.system(
-                f"python {os.path.join(rootthisfiledir,'collectall.py')} {arch} {target}"
-            )
-            exit()
+
         shutil.copytree(
-            f"../build/hook_x64_{target}", "files/LunaHook", dirs_exist_ok=True
+            f"NativeImpl/LunaHook/builds/Release_{target}", "files/LunaHook"
         )
-        shutil.copytree(
-            f"../build/hook_x86_{target}", "files/LunaHook", dirs_exist_ok=True
-        )
-        shutil.copytree(f"../build/cpp_x64_{target}", "NativeImpl/builds", dirs_exist_ok=True)
-        shutil.copytree(f"../build/cpp_x86_{target}", "NativeImpl/builds", dirs_exist_ok=True)
-        os.makedirs("files/DLL32", exist_ok=True)
+        shutil.copytree(f"NativeImpl/builds/_x64_{target}", "NativeImpl/builds")
+        shutil.copytree(f"NativeImpl/builds/_x86_{target}", "NativeImpl/builds")
+        os.makedirs("files/DLL32")
         shutil.copy(f"NativeImpl/builds/_x86_{target}/shareddllproxy32.exe", "files")
         os.system(f"robocopy NativeImpl/builds/_x86_{target} files/DLL32 *.dll")
-        os.makedirs("files/DLL64", exist_ok=True)
+        os.makedirs("files/DLL64")
         shutil.copy(f"NativeImpl/builds/_x64_{target}/shareddllproxy64.exe", "files")
         os.system(f"robocopy NativeImpl/builds/_x64_{target} files/DLL64 *.dll")
 
-        if arch == "x86":
-            os.remove(f"files/LunaHook/LunaHost64.dll")
-        else:
-            os.remove("files/LunaHook/LunaHost32.dll")
         os.system(
             f"python {os.path.join(rootthisfiledir,'collectall.py')} {arch} {target}"
         )
+    elif sys.argv[1] == "exedlls":
+        os.makedirs("../collect")
+        for _ in (
+            "LunaTranslator_x64_win10",
+            "LunaTranslator_x64_win7",
+            "LunaTranslator_x86_win7",
+            "LunaTranslator_x86_winxp",
+        ):
+            for __ in myfiles:
+                f = os.path.join("../build", _, __)
+                if os.path.exists(f):
+                    t = os.path.join("../collect", _, __)
+                    os.makedirs(os.path.dirname(t))
+                    shutil.copy(f, t)
+    elif sys.argv[1] == "repack":
+        os.makedirs("../signed_exedlls")
+        for _dir, _, _fs in os.walk("../signed_exedlls"):
+            print(_dir, _fs)
+            for _f in _fs:
+                f2 = os.path.join(_dir, _f)
+                shutil.copy(f2, f2.replace("signed_exedlls", "build"))
+        os.makedirs("../signed")
+        os.chdir("../build")
+        for d in os.listdir("."):
+            os.system(
+                rf'"C:\Program Files\7-Zip\7z.exe" a -m0=Deflate -mx9 {d}.zip {d}'
+            )
+            shutil.move(f"{d}.zip", "../signed")

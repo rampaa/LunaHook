@@ -53,7 +53,7 @@
     
     当把鼠标移动到**鼠标穿透窗口按钮及其左右一个按钮的区域**时，会自动退出穿透以使用工具按钮；移出区域时自动恢复穿透。
 
-1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> 背景窗口透明 {#anchor-backtransbutton}
+1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> 窗口背景透明 {#anchor-backtransbutton}
     该按钮作用仅是一键使得翻译窗口的不透明度切换到0。这个切换不会使得原本的不透明度设置被遗忘。
     
 1. #### <i class="fa fa-lock"></i> <i class="btnstatus2 fa fa-unlock"></i> 锁定工具栏 {#anchor-locktoolsbutton}
@@ -140,7 +140,7 @@
     该朗读会无视`跳过`（如果在`语音指定`中，匹配当前文本目标为`跳过`，则使用按钮进行朗读时，会无视跳过，强制进行朗读）
 1. #### <i class="fa fa-copy"></i> <i class="fa fa-icon fa-rotate-right"></i> 复制到剪贴板 {#anchor-copy}
     复制当前提取到的文本到剪贴板一次。如果想要自动提取到剪贴板，应当激活`文本输入`->`剪贴板`->`自动输出`->`自动输出文本`。
-1. #### <i class="fa fa-rotate-left"></i> <i class="fa fa-icon fa-rotate-right"></i> 显示/隐藏历史文本 {#anchor-history}
+1. #### <i class="fa fa-history"></i> <i class="fa fa-icon fa-rotate-right"></i> 显示/隐藏历史文本 {#anchor-history}
     打开或关闭历史文本的窗口。
 1. #### <i class="fa fa-gamepad"></i> <i class="fa fa-icon fa-rotate-right"></i> 游戏管理 {#anchor-gamepad_new}
     打开游戏管理器界面。

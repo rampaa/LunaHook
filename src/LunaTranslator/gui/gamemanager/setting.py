@@ -1,8 +1,7 @@
 from qtsymbols import *
-import functools, uuid, os
+import functools, uuid, os, qtawesome, time
 from datetime import datetime, timedelta
 from traceback import print_exc
-from language import TransLanguages
 import gobject, NativeUtils
 import copy
 from myutils.post import processfunctions
@@ -105,7 +104,7 @@ def maybehavebutton(self, gameuid, post):
                         "internal"
                     ],
                     save_text_process_info["postprocessconfig"][post]["name"],
-                    ["正则", "转义", "原文内容", "替换为"],
+                    ["原文内容", "替换为"],
                 )
             elif isinstance(list(postprocessconfig[post]["args"].values())[0], dict):
                 callback = functools.partial(
@@ -191,6 +190,136 @@ def userlabelset(key="usertags"):
     for gameuid in savehook_new_data:
         s = s.union(savehook_new_data[gameuid][key])
     return sorted(list(s))
+
+
+@Singleton
+class timelistediter(LDialog):
+
+    def __init__(
+        self,
+        parent: "dialog_setting_game_internal",
+    ) -> None:
+        super().__init__(parent)
+        gobject.base.somedatabase.lockdata()
+        self.gameuid = parent.gameuid
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowType.WindowContextHelpButtonHint
+        )
+        self.setWindowIcon(qtawesome.icon("fa.edit"))
+        self.setWindowTitle("编辑")
+
+        model = LStandardItemModel()
+        model.setHorizontalHeaderLabels(["开始", "结束", "删除"])
+        self.hcmodel = model
+        table = QTableView()
+        table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QAbstractItemView.SelectionBehavior.SelectRows)
+        table.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        table.setWordWrap(False)
+        table.setModel(model)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        table.horizontalHeader().setSectionResizeMode(
+            2, QHeaderView.ResizeMode.ResizeToContents
+        )
+
+        self.hctable = table
+        self.internalrealname = []
+        self.rm = []
+        formLayout = QVBoxLayout(self)
+        formLayout.addWidget(self.hctable)
+        button = manybuttonlayout(
+            [
+                ("添加行", self.newline),
+                ("保存", self.closeEvent11),
+            ]
+        )
+        formLayout.addLayout(button)
+        self.lst = gobject.base.somedatabase.querytraceplaytime(self.gameuid)
+        self.lst = [list(_) for _ in self.lst]
+        for row, (s, e) in enumerate(self.lst):
+            self.createline(s, e, row)
+        self.resize(600, 400)
+        self.exec()
+
+    def newline(self):
+        t = time.time()
+        self.createline(t, t, self.hcmodel.rowCount())
+        self.lst.append([t, t])
+
+    def createline(self, s, e, row):
+        item = QStandardItem()
+        item2 = QStandardItem()
+        item3 = QStandardItem()
+        self.hcmodel.insertRow(row, [item, item2, item3])
+        detail_time_edit = QDateTimeEdit()
+        detail_time_edit2 = QDateTimeEdit()
+        for _, (i, t, edit) in enumerate(
+            ((item, s, detail_time_edit), (item2, e, detail_time_edit2))
+        ):
+            edit.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+            edit.setDateTime(QDateTime.fromMSecsSinceEpoch(int(t * 1000)))
+            if _ == 0:
+                another = detail_time_edit2
+                another.setMinimumDateTime(edit.dateTime())
+            else:
+                another = detail_time_edit
+                another.setMaximumDateTime(edit.dateTime())
+            edit.dateTimeChanged.connect(
+                functools.partial(self._changed, _, row, another)
+            )
+            self.hctable.setIndexWidget(self.hcmodel.indexFromItem(i), edit)
+        self.hctable.setIndexWidget(
+            self.hcmodel.indexFromItem(item3),
+            getIconButton(
+                callback=functools.partial(self.remote, row), icon="fa.times"
+            ),
+        )
+
+    def remote(self, row):
+        self.hctable.setRowHidden(row, True)
+        self.rm.append(row)
+
+    def _changed(self, i, row, another: QDateTimeEdit, curr: QDateTime):
+        self.lst[row][i] = curr.toMSecsSinceEpoch() / 1000
+        if i == 0:
+            another.setMinimumDateTime(curr)
+        else:
+            another.setMaximumDateTime(curr)
+
+    def closeEvent11(self):
+        lst = []
+        for i, _ in enumerate(self.lst):
+            if i in self.rm:
+                continue
+            if _[0] < _[1]:
+                lst.append(_)
+        lst = self.merge_intervals(lst)
+        gobject.base.somedatabase.settraceplaytime(self.gameuid, lst)
+        self.close()
+
+    def closeEvent(self, a0):
+        gobject.base.somedatabase.unlockdata()
+        return super().closeEvent(a0)
+
+    def merge_intervals(self, intervals):
+        if len(intervals) <= 1:
+            return intervals
+        sorted_intervals = sorted(intervals, key=lambda x: x[0])
+
+        merged = []
+        current = sorted_intervals[0]
+
+        for interval in sorted_intervals[1:]:
+            if interval[0] <= current[1]:
+                current = (current[0], max(current[1], interval[1]))
+            else:
+                merged.append(current)
+                current = interval
+
+        merged.append(current)
+        return merged
 
 
 class dialog_setting_game_internal(QWidget):
@@ -470,7 +599,7 @@ class dialog_setting_game_internal(QWidget):
         self.lauchpath = getsimplepatheditor(
             get_launchpath(gameuid),
             callback=self.selectexe_lauch,
-            icons=("fa.gear", "fa.refresh"),
+            icons=("fa.gear", "fa.undo"),
             clearset=lambda: uid2gamepath[gameuid],
         )
         formLayout.addRow("启动程序", self.lauchpath)
@@ -545,6 +674,9 @@ class dialog_setting_game_internal(QWidget):
                         globalconfig,
                         "is_tracetime_strict",
                         callback=lambda _: t.timeout.emit(),
+                    ),
+                    getIconButton(
+                        icon="fa.edit", callback=functools.partial(timelistediter, self)
                     ),
                 ]
             )
@@ -805,7 +937,7 @@ class dialog_setting_game_internal(QWidget):
                 self,
                 savehook_new_data[gameuid]["tts_repair_regex"],
                 "语音修正",
-                ["正则", "转义", "原文", "替换"],
+                ["原文", "替换"],
                 extraX=savehook_new_data[gameuid],
             )
 
@@ -876,7 +1008,7 @@ class dialog_setting_game_internal(QWidget):
                 False,
                 "*.sqlite",
                 functools.partial(selectimg, gameuid, "gamesqlitefile"),
-                icons=("fa.folder-open", "fa.refresh"),
+                icons=("fa.folder-open", "fa.undo"),
             ),
         )
 
@@ -1206,6 +1338,29 @@ class dialog_setting_game_internal(QWidget):
                         callback=lambda _: gobject.base.textsource.flashembedsettings(),
                     ),
                     functools.partial(self.creategamefont_comboBox, gameuid),
+                ]
+            ),
+        )
+        formLayout2.addRow(
+            "修改游戏字体相对大小",
+            getboxlayout(
+                [
+                    D_getsimpleswitch(
+                        savehook_new_data[gameuid]["embed_setting_private"],
+                        "changefontsize_use",
+                        default=globalconfig["embedded"]["changefontsize_use"],
+                        callback=lambda _: gobject.base.textsource.flashembedsettings(),
+                    ),
+                    D_getspinbox(
+                        0.5,
+                        2,
+                        savehook_new_data[gameuid]["embed_setting_private"],
+                        "changefontsize",
+                        default=globalconfig["embedded"]["changefontsize"],
+                        step=0.01,
+                        double=True,
+                        callback=lambda _: gobject.base.textsource.flashembedsettings(),
+                    ),
                 ]
             ),
         )

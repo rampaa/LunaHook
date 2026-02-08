@@ -40,9 +40,11 @@ class cdp_deepl(cdp_helper):
             """document.getElementsByTagName("d-textarea")[0].focus()"""
         )
         self.send_keys(content)
-
-        return self.wait_for_result(
+        self.wait_for_result(
             'document.getElementsByTagName("d-textarea")[1].textContent'
+        )
+        return self.wait_for_result(
+            'document.getElementsByTagName("d-textarea")[1].innerText'
         )
 
 

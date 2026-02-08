@@ -64,7 +64,7 @@
 
     Gemini 플랫폼에서는 이 옵션을 Gemini의 `thinkingBudget`에 자동으로 매핑합니다. 매핑 규칙은 다음과 같습니다: 
     
-    minimal→0(사고 비활성화, 단 Gemini-2.5-Pro 모델에는 적용되지 않음), low→512, medium→-1(동적 사고 활성화), high→24576.  
+    none/minimal→0(사고 비활성화, 단 Gemini-2.5-Pro 모델에는 적용되지 않음), low→512, medium→-1(동적 사고 활성화), high/xhigh→24576.  
 
 1. #### 기타 파라미터  
 
@@ -83,6 +83,10 @@
 == Gemini
 
 **API Key** https://aistudio.google.com/app/apikey
+
+== Nvidia
+
+**API Key** https://build.nvidia.com/explore/discover
 
 == claude
 
@@ -202,7 +206,7 @@
 
 [new-api](https://github.com/QuantumNous/new-api)와 같은 API 중계 도구를 사용하여 여러 대형 모델 플랫폼 모델과 여러 키를 보다 편리하게 집계 관리할 수도 있습니다.
 
-사용 방법은 [이 글](https://www.newapi.ai/apps/luna-translator/)을 참조하십시오.
+사용 방법은 [이 글](https://www.newapi.ai/en/docs/apps/luna-translator)을 참조하십시오.
 
 
 ### 오프라인 배포 모델

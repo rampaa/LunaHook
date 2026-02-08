@@ -9,7 +9,11 @@
 #include "engine32/PixelGameMakerMVplayer.h"
 #include "engine32/LCScript.h"
 #include "engine32/Hug.h"
+#include "engine32/AZScript.h"
+#include "engine32/Furaiki.h"
+#include "engine32/Milk.h"
 #include "engine32/Cage.h"
+#include "engine32/MBSTRUTH.h"
 #include "engine32/ONScripterru.h"
 #include "engine32/ADVSystem.h"
 #include "engine32/Pinpai.h"
@@ -423,6 +427,7 @@ std::vector<ENGINE *> check_engines()
         new Suika2,
         new KISS,
         new EntisGLS,
+        new Furaiki,
         //
         //
         new DISCOVERY,
@@ -471,5 +476,8 @@ std::vector<ENGINE *> check_engines()
         new R11,
         new For,
         new AniSeed,
+        new MBSTRUTH,
+        new Milk,
+        new AZScript,
     };
 }

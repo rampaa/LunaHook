@@ -1097,7 +1097,7 @@ namespace
         strReplace(text, shortPause);
       }
       // I need a cache retainer here to make sure same text result in same result
-      void hookafter(hook_context *s, TextBuffer buffer)
+      void hookafter(hook_context *s, TextBuffer buffer, HookParam *)
       {
         static std::unordered_set<uint64_t> hashes_;
         auto text = (LPCWSTR)s->stack[1];
@@ -1708,11 +1708,50 @@ namespace
 
 }
 
+static bool h7()
+{
+  auto RichString_FormatEx = GetProcAddress(GetModuleHandleW(L"tools.dll"), "RichString_FormatEx");
+  if (!RichString_FormatEx)
+    return false; // 防止脑残问为什么failed
+  // タペストリー
+  static bool _switch = false;
+  static std::wstring __s;
+  HookParam hp{};
+  hp.type = CODEC_UTF16 | USING_STRING;
+  hp.offset = stackoffset(2);
+  hp.address = (DWORD)RichString_FormatEx;
+  hp.filter_fun = [](TextBuffer *buffer, HookParam *)
+  {
+    static std::wstring last;
+    auto s = buffer->strW();
+    _switch = (last == s);
+    if (!_switch)
+      __s = L"\n";
+    last = s;
+    buffer->clear();
+  };
+  if (!NewHook(hp, "RichString_FormatEx"))
+    return false;
+  HookParam hp2{};
+  hp2.address = (DWORD)GetTextExtentExPointW;
+  hp2.type = CODEC_UTF16 | USING_CHAR | DATA_INDIRECT;
+  hp2.offset = stackoffset(2);
+  hp2.filter_fun = [](TextBuffer *buffer, HookParam *)
+  {
+    if (_switch)
+    {
+      buffer->from(__s);
+      __s.clear();
+    }
+  };
+  return NewHook(hp2, "GetTextExtentExPointW");
+}
 bool Malie::attach_function()
 {
   bool embed = ScenarioHook::attach(processStartAddress, processStopAddress);
   //   if(embed)Patch::attachFont(processStartAddress,processStopAddress); 导致闪退，放弃
   auto b1 = InsertMalieHook() || embed;
   b1 = malie_light() || b1;
+  b1 |= h7();
   return b1;
 }

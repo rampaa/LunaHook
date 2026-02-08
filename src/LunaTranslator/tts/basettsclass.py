@@ -12,19 +12,51 @@ from myutils.mimehelper import query_mime
 
 class TTSResult:
     def __bool__(self):
-        return bool((not self.error) and self.data)
+        return bool((not self.error) and (self.__ref or self.__data))
 
     @property
     def ext(self):
-        if "/" in self._type:
-            return self._type.split("/")[1]
+        if "/" in self.__type:
+            return self.__type.split("/")[1]
         return "wav"
 
     @property
     def mime(self):
-        if "/" in self._type:
-            return self._type
-        return query_mime(self._type)
+        if "/" in self.__type:
+            return self.__type
+        return query_mime(self.__type)
+
+    @property
+    def data(self):
+        if self.__ref:
+            return self.__ref.data
+        return self.__data
+
+    def receive_all(self):
+        _ = self.data
+        if isinstance(_, types.GeneratorType):
+            return b"".join(_)
+        return _
+
+    def _make_generater(self, data: types.GeneratorType):
+        self.__data = b""
+        __ = 0
+        needcl = not self.__content_length
+        try:
+            for _ in data:
+                yield _
+                self.__data += _
+                __ += len(_)
+                if needcl:
+                    self.__content_length = __
+        except Exception as e:
+            self.error = e
+            raise Exception(e)
+
+    def __len__(self):
+        if self.__ref:
+            return self.__ref.__content_length
+        return self.__content_length
 
     def __init__(
         self,
@@ -32,17 +64,32 @@ class TTSResult:
         type: str = "audio/wav",
         error=None,
     ):
+        self.__ref = None
+        self.__data = None
+        self.__content_length = 0
         if isinstance(data, TTSResult):
-            self.data = data.data
+            if isinstance(data.__data, types.GeneratorType):
+                self.__ref = data
+            else:
+                self.__data = data.__data
             self.error = data.error
-            self._type = data._type
+            self.__type = data.__type
+            self.__content_length = data.__content_length
+        elif isinstance(data, types.GeneratorType):
+            self.__data = self._make_generater(data)
+            self.__type = type
         elif isinstance(data, Response):
             data.raise_for_status()
-            self.data = data.content
-            self._type = data.headers.get("content-type", type)
-        else:
-            self.data = data
-            self._type = type
+            if data.stream:
+                self.__data = self._make_generater(data.iter_content(32 * 1024))
+            else:
+                self.__data = data.content
+            self.__content_length = int(data.headers.get("content-length", 0))
+            self.__type = data.headers.get("content-type", type)
+        elif isinstance(data, bytes):
+            self.__data = data
+            self.__type = type
+            self.__content_length = len(data)
         self.error = error
 
 
@@ -107,7 +154,7 @@ class TTSbase(commonbase):
     def __init__(
         self,
         typename,
-        playaudiofunction,
+        playaudiofunction=None,
         privateconfig: dict = None,
         init=True,
         uid=None,
@@ -135,6 +182,8 @@ class TTSbase(commonbase):
 
         def _(force, volume, timestamp, data: TTSResult):
             if not data:
+                return
+            if not self.playaudiofunction:
                 return
             self.playaudiofunction(data.data, volume, force, timestamp)
 

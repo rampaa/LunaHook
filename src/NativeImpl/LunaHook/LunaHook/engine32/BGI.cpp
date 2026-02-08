@@ -90,7 +90,7 @@ namespace
         i++;
         if (id[0] == 0xffff)
         { // cmp eax,0xffff
-          hp.address = SafeFindEnclosingAlignedFunction(i, 0x40);
+          hp.address = MemDbg::findEnclosingAlignedFunction(i, 0x40);
           if (hp.address)
           {
             hp.offset = stackoffset(3);
@@ -108,7 +108,7 @@ namespace
         i += 2;
         if (id[0] == 0xffff)
         { // cmp reg,0xffff
-          hp.address = SafeFindEnclosingAlignedFunction(i, 0x40);
+          hp.address = MemDbg::findEnclosingAlignedFunction(i, 0x40);
           if (hp.address)
           {
             hp.offset = stackoffset(3);
@@ -1140,7 +1140,7 @@ namespace
     hp.type = USING_STRING | USING_SPLIT | EMBED_ABLE | EMBED_DYNA_SJIS | NO_CONTEXT;
 
     hp.text_fun = Private::hookBefore;
-    hp.embed_fun = [](hook_context *context, TextBuffer buffer)
+    hp.embed_fun = [](hook_context *context, TextBuffer buffer, HookParam *)
     {
       std::string sorigin = (char *)context->stack[Private::textIndex_];
       std::string s = buffer.strA();
@@ -1163,11 +1163,7 @@ namespace
       {
         result = result.substr(0, result.size() - 1);
       }
-      if (startWith(result, "\x04"))
-      {
-        result = result.substr(1);
-      }
-      buffer->from(result);
+      buffer->from(strReplace(result, "\x04"));
     };
 
     hp.split = stackoffset(8); // pseudo arg8
@@ -1199,7 +1195,7 @@ void BGI7Filter(TextBuffer *buffer, HookParam *)
 
 void BGI56Filter(TextBuffer *buffer, HookParam *)
 {
-  auto text = reinterpret_cast<LPSTR>(buffer->buff);
+  auto text = reinterpret_cast<LPSTR>(buffer->data);
 
   if (text[0] == '@')
   {

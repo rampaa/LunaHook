@@ -73,7 +73,7 @@ export const cht = defineConfig({
         nav: [
             // { text: "官方網站", link: "https://lunatranslator.org/" },
             { text: "影片教學", link: "https://space.bilibili.com/592120404/video" },
-            { text: "QQ 群", link: "https://qm.qq.com/q/I5rr3uEpi2" },
+            { text: "QQ 群", link: "https://qm.qq.com/q/mPSu3sG5ri" },
             { text: "Discord", link: "https://discord.com/invite/ErtDwVeAbB" },
             { text: "支持作者", link: "/cht/support" },
         ],
@@ -134,7 +134,7 @@ export const cht = defineConfig({
                         text: '語言學習', link: '/cht/qa1',
                         collapsed: true,
                         items: [
-                            { text: '日語分詞及假名注音', link: '/cht/qa1' },
+                            { text: '日文分詞及假名注音', link: '/cht/qa1' },
                             { text: '使用內建查詞工具', link: '/cht/internaldict' },
                             { text: '安裝 Yomitan 瀏覽器外掛程式', link: '/cht/yomitan' },
                             { text: 'Anki 整合', link: '/cht/qa2' },

@@ -4,7 +4,7 @@ from traceback import print_exc
 import os, gobject, requests, sys, uuid
 from myutils.commonbase import maybejson
 from myutils.config import globalconfig, _TR, static_data
-from myutils.utils import selectdebugfile
+from myutils.utils import selectdebugfile, makehtml
 from myutils.wrapper import Singleton
 from gui.usefulwidget import (
     MySwitch,
@@ -21,6 +21,7 @@ from gui.usefulwidget import (
     SplitLine,
     getIconButton,
     VisLFormLayout,
+    LinkLabel,
 )
 from gui.dynalang import (
     LFormLayout,
@@ -32,26 +33,32 @@ from gui.dynalang import (
 )
 
 
-@Singleton
-class noundictconfigdialog1(LDialog):
+class noundictconfigdialog1___(LDialog):
     def newline(self, row, item: dict):
-        self.model.insertRow(
-            row,
-            [
-                QStandardItem(),
-                QStandardItem(),
-                QStandardItem(item["key"]),
-                QStandardItem(item["value"]),
-            ],
-        )
-        self.table.setindexdata(self.model.index(row, 0), item.get("regex", False))
-        self.table.setindexdata(
-            self.model.index(row, 1), item.get("escape", item.get("regex", False))
-        )
+        items = []
+        for _ in self.switchcols:
+            items.append(QStandardItem())
+        for _ in self.dictkeys:
+            items.append(QStandardItem(item.get(_, "")))
+        self.model.insertRow(row, items)
+        for _, k in enumerate(self.switchkeys):
+            self.table.setindexdata(self.model.index(row, _), item.get(k, False))
 
-    def __init__(self, parent, reflist, title, label, extraX: dict = None) -> None:
+    def __init__(
+        self,
+        parent,
+        reflist: list,
+        title,
+        label,
+        extraX: dict = None,
+        need_regex=True,
+        dictkeys=None,
+    ) -> None:
         super().__init__(parent, Qt.WindowType.WindowCloseButtonHint)
         self.setWindowTitle(title)
+        self.need_regex = need_regex
+        self.dictkeys = dictkeys if dictkeys else ["key", "value"]
+        self.label = label
         # self.setWindowModality(Qt.ApplicationModal)
         self.reflist = reflist
         formLayout = QVBoxLayout(self)  # 配置layout
@@ -72,17 +79,19 @@ class noundictconfigdialog1(LDialog):
                 getboxlayout([getsmalllabel("自定义python处理"), switch, last, 0])
             )
         self.model = LStandardItemModel()
-        self.model.setHorizontalHeaderLabels(label)
+        self.model.setHorizontalHeaderLabels(
+            ["正则", "区分大小写", "全字匹配"][(1, 0)[need_regex] :] + label
+        )
         table = TableViewW(self, copypaste=True, updown=True)
         table.setModel(self.model)
-        table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        table.horizontalHeader().setSectionResizeMode(
-            1, QHeaderView.ResizeMode.ResizeToContents
-        )
-        table.horizontalHeader().setSectionResizeMode(
-            0, QHeaderView.ResizeMode.ResizeToContents
-        )
+        for _ in self.textcols:
+            table.horizontalHeader().setSectionResizeMode(
+                _, QHeaderView.ResizeMode.Stretch
+            )
+        for _ in self.switchcols:
+            table.horizontalHeader().setSectionResizeMode(
+                _, QHeaderView.ResizeMode.ResizeToContents
+            )
 
         self.table = table
 
@@ -109,9 +118,7 @@ class noundictconfigdialog1(LDialog):
         search.addWidget(button4)
         table.getindexdata = self.__getindexwidgetdata
         table.setindexdata = self.__setindexwidget
-        table.insertplainrow = lambda row: self.newline(
-            row, {"key": "", "value": "", "regex": False}
-        )
+        table.insertplainrow = lambda row: self.newline(row, {})
         self.table = table
         for row, item in enumerate(reflist):
             self.newline(row, item)
@@ -133,42 +140,57 @@ class noundictconfigdialog1(LDialog):
         self.resize(QSize(600, 400))
         self.show()
 
+    @property
+    def textcols(self):
+        return tuple(range(2 + self.need_regex, self.model.columnCount()))
+
+    @property
+    def textkeys(self):
+        return dict(zip(self.dictkeys, self.textcols))
+
+    @property
+    def switchcols(self):
+        if self.need_regex:
+            return (0, 1, 2)
+        return (0, 1)
+
+    @property
+    def switchkeys(self):
+        if self.need_regex:
+            return ["regex", "case-sensitive", "whole-word"]
+        return ["case-sensitive", "whole-word"]
+
     def __setindexwidget(self, index: QModelIndex, data):
-        if index.column() in (0, 1):
+        if index.column() in self.switchcols:
             bval = self.table.compatiblebool(data)
             self.table.setIndexData(index, bval)
         else:
             self.table.model().setItem(index.row(), index.column(), QStandardItem(data))
 
     def __getindexwidgetdata(self, index: QModelIndex):
-        if index.column() in (0, 1):
+        if index.column() in self.switchcols:
             return index.data(self.table.ValRole)
         return self.model.itemFromIndex(index).text()
 
     def apply(self):
         def __check(row):
-            k = self.table.getdata(row, 2)
-            if k == "":
+            k = self.table.getdata(row, 2 + self.need_regex)
+            if not k:
                 return ""
-            switch = self.table.getdata(row, 0)
-            es = self.table.getdata(row, 1)
-            return (switch, es, k)
+            switchs = tuple(self.table.getdata(row, _) for _ in self.switchcols)
+            return (switchs, k)
 
         self.table.dedumpmodel(__check)
         self.reflist.clear()
         for row in range(self.model.rowCount()):
-            k = self.table.getdata(row, 2)
-            v = self.table.getdata(row, 3)
-            switch = self.table.getdata(row, 0)
-            es = self.table.getdata(row, 1)
-            self.reflist.append(
-                {
-                    "key": k,
-                    "value": v,
-                    "escape": es,
-                    "regex": switch,
-                }
-            )
+            d = {}
+            for k, v in self.textkeys.items():
+                d[k] = self.table.getdata(row, v)
+            for i, k in enumerate(self.switchkeys):
+                __ = self.table.getdata(row, i)
+                if __:
+                    d[k] = __
+            self.reflist.append(d)
 
     def closeEvent(self, a0: QCloseEvent) -> None:
         self.setFocus()
@@ -272,9 +294,9 @@ class yuyinzhidingsetting(LDialog):
             ],
         )
         self.table.setindexdata(self.model.index(row, 0), item.get("range", 0))
-        self.table.setindexdata(self.model.index(row, 1), item["regex"])
+        self.table.setindexdata(self.model.index(row, 2), item["regex"])
 
-        self.table.setindexdata(self.model.index(row, 2), item["condition"])
+        self.table.setindexdata(self.model.index(row, 1), item["condition"])
         self.table.setindexdata(self.model.index(row, 4), item["target"])
 
     def createacombox(self, config):
@@ -335,7 +357,7 @@ class yuyinzhidingsetting(LDialog):
         formLayout = QVBoxLayout(self)  # 配置layout
 
         self.model = LStandardItemModel()
-        self.model.setHorizontalHeaderLabels(["范围", "正则", "条件", "目标", "指定为"])
+        self.model.setHorizontalHeaderLabels(["范围", "条件", "正则", "目标", "指定为"])
         table = TableViewW(self, updown=True)
         table.setModel(self.model)
         table.horizontalHeader().setSectionResizeMode(3, QHeaderView.ResizeMode.Stretch)
@@ -400,10 +422,10 @@ class yuyinzhidingsetting(LDialog):
             self.table.setIndexWidget(
                 index, getsimplecombobox(["全部", "原文", "翻译"], data, "range")
             )
-        elif index.column() == 1:
+        elif index.column() == 2:
             data = {"regex": self.table.compatiblebool(data)}
             self.table.setIndexWidget(index, getsimpleswitch(data, "regex"))
-        elif index.column() == 2:
+        elif index.column() == 1:
             try:
                 data = int(data)
             except:
@@ -427,9 +449,9 @@ class yuyinzhidingsetting(LDialog):
     def __getindexwidgetdata(self, index: QModelIndex):
         if index.column() == 0:
             return self.table.indexWidgetX(index).currentIndex()
-        if index.column() == 1:
-            return self.table.indexWidgetX(index).isChecked()
         if index.column() == 2:
+            return self.table.indexWidgetX(index).isChecked()
+        if index.column() == 1:
             return self.table.indexWidgetX(index).currentIndex()
         if index.column() == 4:
             return self.table.indexWidgetX(index).target
@@ -441,8 +463,8 @@ class yuyinzhidingsetting(LDialog):
         self.reflist.clear()
         for row in range(rows):
             k = self.table.getdata(row, 3)
-            switch = self.table.getdata(row, 1)
-            con = self.table.getdata(row, 2)
+            switch = self.table.getdata(row, 2)
+            con = self.table.getdata(row, 1)
             con2 = self.table.getdata(row, 4)
             self.reflist.append(
                 {
@@ -538,6 +560,9 @@ class autoinitdialog(LDialog):
             key = line["k"]
         if line["type"] == "label":
             lineW = LLabel(dd[key])
+        elif line["type"] == "link":
+            lineW = LinkLabel()
+            lineW.setText(makehtml(dd[key], dd[key]))
         elif line["type"] == "textlist":
             directedit = isinstance(dd[key], str)
             if directedit:
@@ -557,7 +582,7 @@ class autoinitdialog(LDialog):
                 lineWF = getattr(
                     importlib.import_module(self.modelfile), line["function"]
                 )
-                lineW = lineWF(self._dict)
+                lineW = lineWF(self._dict, key)
                 self.updater[key] = lineW.updateValues
             except:
                 print_exc()
@@ -615,6 +640,7 @@ class autoinitdialog(LDialog):
                     getIconButton(
                         callback=functools.partial(self.__refresh, line, combo),
                         icon="fa.refresh",
+                        tips="刷新",
                     )
                 )
             lineW.addWidget(combo)
@@ -759,12 +785,16 @@ class autoinitdialog(LDialog):
                 continue
             oklines.append(line)
         lines = oklines
-        self.cachecombo = {}
+        self.cachecombo: "dict[str, SuperCombo]" = {}
         self.cachehasref = {}
         for line in lines:
             if line.get("hide"):
                 continue
-            lineW = self.createobject(line, dd)
+            try:
+                lineW = self.createobject(line, dd)
+            except Exception as e:
+                print(line)
+                raise e
             if not lineW:
                 continue
             appends = line.get("appends", None)
@@ -809,16 +839,20 @@ class autoinitdialog(LDialog):
             refitems,
         ) in self.cachehasref.items():
 
-            def refcombofunction(refitems, _i):
+            def refcombofunction(
+                refitems: "list[tuple[dict, int]]", combo: SuperCombo, __i
+            ):
                 viss = []
                 for linwinfo, row in refitems:
                     vis = True
-                    if linwinfo.get("refcombo_i") is not None:
-                        vis = linwinfo.get("refcombo_i") == _i
-                    elif linwinfo.get("refcombo_i_r") is not None:
-                        vis = linwinfo.get("refcombo_i_r") != _i
-                    elif linwinfo.get("refcombo_l") is not None:
-                        vis = _i in linwinfo.get("refcombo_l")
+                    _i = combo.getIndexData(__i)
+                    if _i is None:
+                        _i = __i
+                    refcombo_i: "str | int | list | tuple" = linwinfo.get("refcombo_i")
+                    if isinstance(refcombo_i, (str, int)):
+                        vis = refcombo_i == _i
+                    elif isinstance(refcombo_i, (list, tuple)):
+                        vis = _i in refcombo_i
                     if not vis:
                         formLayout.setRowVisible(row, False)
                     else:
@@ -829,7 +863,9 @@ class autoinitdialog(LDialog):
                 self.resize(self.width(), 1)
 
             self.cachecombo[comboname].currentIndexChanged.connect(
-                functools.partial(refcombofunction, refitems)
+                functools.partial(
+                    refcombofunction, refitems, self.cachecombo[comboname]
+                )
             )
             self.cachecombo[comboname].currentIndexChanged.emit(
                 self.cachecombo[comboname].currentIndex()
@@ -940,6 +976,11 @@ class postconfigdialog_(postconfigdialog_1):
 
 def postconfigdialog(parent, configdict, title, header):
     postconfigdialog_(parent, configdict, title, header)
+
+
+@Singleton
+class noundictconfigdialog1(noundictconfigdialog1___):
+    pass
 
 
 def postconfigdialog2x(parent, reflist, title, header):

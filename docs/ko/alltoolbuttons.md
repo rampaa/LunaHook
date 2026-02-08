@@ -53,7 +53,7 @@
 
     마우스를 **마우스 창 투과 버튼 및 그 좌우 한 버튼 영역**으로 이동하면 자동으로 투과 모드를 해제하여 도구 버튼을 사용할 수 있으며, 영역 밖으로 이동하면 자동으로 투과 모드가 복구됩니다.
 
-1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> 배경 창 투명 {#anchor-backtransbutton}
+1. #### <i class="fa fa-lightbulb"></i> <i class="btnstatus2 fa fa-lightbulb"></i> 창 배경 투명 {#anchor-backtransbutton}
     이 버튼은 번역 창의 불투명도를 0으로 전환하는 기능만 수행합니다. 이 전환은 원래의 불투명도 설정을 잊어버리게 하지 않습니다.
 
 1. #### <i class="fa fa-lock"></i> <i class="btnstatus2 fa fa-unlock"></i> 툴바 잠금 {#anchor-locktoolsbutton}
@@ -140,7 +140,7 @@
     이 음성 재생은 '건너뛰기'를 무시합니다(`음성 지정`에서 현재 텍스트 대상이 '건너뛰기'로 매칭된 경우에도, 버튼을 사용하여 재생하면 건너뛰기를 무시하고 강제로 재생합니다).
 1. #### <i class="fa fa-copy"></i> <i class="fa fa-icon fa-rotate-right"></i> 클립보드에 복사 {#anchor-copy}
     현재 추출된 텍스트를 클립보드에 한 번 복사합니다. 자동으로 클립보드에 추출하려면 `텍스트 입력`->`클립보드`->`자동 출력`->`텍스트 자동 출력`을 활성화해야 합니다.
-1. #### <i class="fa fa-rotate-left"></i> <i class="fa fa-icon fa-rotate-right"></i> 기록 텍스트 표시/숨기기 {#anchor-history}
+1. #### <i class="fa fa-history"></i> <i class="fa fa-icon fa-rotate-right"></i> 기록 텍스트 표시/숨기기 {#anchor-history}
     기록 텍스트 창을 열거나 닫습니다.
 1. #### <i class="fa fa-gamepad"></i> <i class="fa fa-icon fa-rotate-right"></i> 게임 관리 {#anchor-gamepad_new}
     게임 관리자 인터페이스를 엽니다.

@@ -51,7 +51,7 @@
 
     自訂 System Prompt 和 User Message 中可以使用變數來引用一些訊息：
     - `{sentence}`：目前欲翻譯的文字。
-    - `{srclang}`和`{tgtlang}`：來源語言和目標語言。如果 Prompt 中僅使用英語，則會取代成語言名稱的英語翻譯，否則會取代成語言名稱的目前 UI 語言翻譯。
+    - `{srclang}`和`{tgtlang}`：來源語言和目標語言。如果 Prompt 中僅使用英文，則會取代成語言名稱的英文翻譯，否則會取代成語言名稱的目前 UI 語言翻譯。
     - `{contextOriginal[N]}`和`{contextTranslation[N]}`和`{contextTranslation[N]}`：`N`筆歷史原文、譯文、兩者。`N`與「附帶上下文個數」無關，輸入時需替換成整數。
     - `{DictWithPrompt[XXXXX]}`：此欄位可以引用「專有名詞翻譯」清單中的詞條。**當沒有匹配到的詞條時，該欄位會被清除以避免破壞翻譯內容**。其中，`XXXXX`是一段引導LLM使用給定的詞條來最佳化翻譯的提示，可以自行定義，或停用自訂使用者訊息以使用預設的提示。
 
@@ -63,7 +63,7 @@
 
     對於 Gemini 平台，會自動將選項映射為 Gemini 的`thinkingBudget`，映射規則為：
 
-    `minimal`->`0`（停用思考，但對於 Gemini-2.5-Pro 模型不適用）；`low`->`512`；`medium`->`-1`（啟用動態思維）；`high`->`24576`。
+    `none/minimal`->`0`（停用思考，但對於 Gemini-2.5-Pro 模型不適用）；`low`->`512`；`medium`->`-1`（啟用動態思維）；`high/xhigh`->`24576`。
 
 1. #### 其他參數
 
@@ -82,6 +82,10 @@
 == Gemini
 
 **API Key** https://aistudio.google.com/app/apikey
+
+== Nvidia
+
+**API Key** https://build.nvidia.com/explore/discover
 
 == claude
 
@@ -201,7 +205,7 @@
 
 也可以使用[new-api](https://github.com/QuantumNous/new-api)等API中繼工具，更方便地聚合管理多種大模型平台模型和多個金鑰。
 
-使用方法可以參考[此文章](https://www.newapi.ai/apps/luna-translator/).
+使用方法可以參考[此文章](https://www.newapi.ai/zh/docs/apps/luna-translator).
 
 
 ### 离线部署模型

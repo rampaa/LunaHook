@@ -1,6 +1,6 @@
 import os, zipfile
-from myutils.utils import dynamiclink, stringfyerror
-from myutils.config import _TR, globalconfig
+from myutils.utils import stringfyerror
+from myutils.config import _TR, globalconfig, dynamiclink
 from language import Languages
 from ocrengines.baseocrclass import baseocr, OCRResult
 from CVUtils import (
@@ -8,13 +8,15 @@ from CVUtils import (
     SysNotSupport,
     ModelLoadFailed,
     GetDeviceInfoD3D12,
-    OcrIsDMLAvailable,
+    OcrIsProviderAvailable,
+    GetOpenVINODeviceTypes,
 )
 import gobject, requests, json, shutil, hashlib
 from traceback import print_exc
 from qtsymbols import *
 from myutils.wrapper import threader
 from myutils.proxy import getproxy
+from myutils.utils import format_bytes
 from gui.usefulwidget import (
     SuperCombo,
     getboxwidget,
@@ -32,31 +34,41 @@ from gui.dynalang import LDialog, LFormLayout
 
 @Singleton
 class customwidget(LDialog):
-    delayload = pyqtSignal(list)
+    delayload = pyqtSignal(int, list)
 
-    def __delayload(self, config__, lform: LFormLayout, devices):
+    def __delayload(self, config__, lform: LFormLayout, t, devices):
         lform.removeRow(lform.rowCount() - 2)
         if devices:
             print(devices)
-            for i, _ in enumerate(devices):
-                if i == 0:
-                    _[-1] = "默认_[[({})]]".format(_[-1])
-                else:
-                    _[-1] = "[[{}]]".format(_[-1])
-            d = getsimplecombobox(
-                [_[1] for _ in devices],
-                config__,
-                "luid",
-                internal=[_[0] for _ in devices],
-            )
-            d.setEnabled(config__["gpu"])
-            lform.insertRow(
-                lform.rowCount() - 1,
-                "使用GPU",
-                getboxlayout(
-                    [getsimpleswitch(config__, "gpu", callback=d.setEnabled), d]
-                ),
-            )
+            if t == 0:
+                for i, _ in enumerate(devices):
+                    if i == 0:
+                        _[-1] = "默认_[[({})]]".format(_[-1])
+                    else:
+                        _[-1] = "[[{}]]".format(_[-1])
+                d = getsimplecombobox(
+                    [_[1] for _ in devices],
+                    config__,
+                    "luid",
+                    internal=[_[0] for _ in devices],
+                )
+                d.setEnabled(config__["gpu"])
+                lform.insertRow(
+                    lform.rowCount() - 1,
+                    "使用GPU",
+                    getboxlayout(
+                        [getsimpleswitch(config__, "gpu", callback=d.setEnabled), d]
+                    ),
+                )
+            elif t == 1:
+                d = getsimplecombobox(
+                    devices,
+                    config__,
+                    "device_type",
+                    internal=devices,
+                )
+                lform.insertRow(lform.rowCount() - 1, "Device", d)
+
         else:
             lform.insertRow(
                 lform.rowCount() - 1, "当前软件或操作系统版本不支持使用GPU", None
@@ -65,7 +77,7 @@ class customwidget(LDialog):
     @threader
     def __load(self):
         devices = GetDeviceInfoD3D12()
-        self.delayload.emit(devices)
+        self.delayload.emit(0, devices)
 
     def __init__(self, parent, config: dict, title) -> None:
         super().__init__(parent, Qt.WindowType.WindowCloseButtonHint)
@@ -85,9 +97,13 @@ class customwidget(LDialog):
         lineW.button(QDialogButtonBox.StandardButton.Ok).setText(_TR("确定"))
         lineW.button(QDialogButtonBox.StandardButton.Cancel).setText(_TR("取消"))
         lform.addRow(lineW)
-        if OcrIsDMLAvailable():
+        if OcrIsProviderAvailable("DML"):
             lform.insertRow(lform.rowCount() - 1, "正在加载可用GPU", None)
             self.__load()
+        elif OcrIsProviderAvailable("OpenVINO"):
+            lform.insertRow(lform.rowCount() - 1, "正在加载可用GPU", None)
+            devices = GetOpenVINODeviceTypes()
+            self.delayload.emit(1, devices)
         else:
             lform.insertRow(
                 lform.rowCount() - 1, "当前软件或操作系统版本不支持使用GPU", None
@@ -252,15 +268,15 @@ class question(QWidget):
         target = gobject.gettempdir("ocrmodel/" + hashlib.md5(url.encode()).hexdigest())
         md5 = hashlib.md5()
         with open(target, "wb") as ff:
+            asize = format_bytes(size)
             for _ in req.iter_content(chunk_size=1024 * 32):
                 ff.write(_)
                 md5.update(_)
                 file_size += len(_)
                 prg = int(10000 * file_size / size)
                 prg100 = prg / 100
-                sz = int(1000 * (int(size / 1024) / 1024)) / 1000
                 self.progresssetval.emit(
-                    _TR("总大小_{} MB _进度_{:0.2f}%").format(sz, prg100),
+                    _TR("总大小_{} _进度_{:0.2f}%").format(asize, prg100),
                     prg,
                 )
         self.progresssetval.emit(_TR("正在解压"), 10000)
@@ -453,6 +469,7 @@ class OCR(baseocr):
                 self.config["thread"],
                 self.config["gpu"],
                 self.config["luid"],
+                self.config["device_type"],
             )
         except SysNotSupport:
             raise Exception(_TR("系统不支持"))

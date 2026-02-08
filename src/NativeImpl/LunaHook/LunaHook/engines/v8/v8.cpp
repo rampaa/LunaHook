@@ -46,6 +46,8 @@ namespace
 		std::wstring transwithfont = magicrecv;
 		transwithfont += commonsharedmem->fontFamily;
 		transwithfont += L'\x02';
+		transwithfont += std::to_wstring(commonsharedmem->FontSizeRelative);
+		transwithfont += L'\x03';
 		transwithfont += view;
 		return transwithfont;
 	}
@@ -63,7 +65,7 @@ namespace
 			parsebefore((wchar_t *)GlobalLock(hClipboardData), hp, split, buffer);
 			GlobalUnlock(hClipboardData);
 		};
-		hp.embed_fun = [](hook_context *s, TextBuffer buffer)
+		hp.embed_fun = [](hook_context *s, TextBuffer buffer, HookParam *)
 		{
 			std::wstring transwithfont = parseafter(buffer.viewW());
 			HGLOBAL hClipboardData = GlobalAlloc(GMEM_MOVEABLE, transwithfont.size() * 2 + 2);
@@ -86,7 +88,7 @@ namespace
 		{
 			parsebefore((wchar_t *)context->argof(1), hp, split, buffer);
 		};
-		hp.embed_fun = [](hook_context *s, TextBuffer buffer)
+		hp.embed_fun = [](hook_context *s, TextBuffer buffer, HookParam *)
 		{
 			std::wstring transwithfont = parseafter(buffer.viewW());
 			s->argof(1) = (uintptr_t)allocateString(transwithfont);
@@ -340,7 +342,7 @@ namespace
 				R"(\\?\)", // 路径
 			};
 			if (std::any_of(checks.begin(), checks.end(), [&](auto str)
-							{ return strstr((char *)buffer->buff, str) != 0; }))
+							{ return strstr((char *)buffer->data, str) != 0; }))
 			{
 				return buffer->clear();
 			}
@@ -378,7 +380,9 @@ bool tryhookv8()
 		if (hm == 0)
 			continue;
 		auto stringsucc = hookstring(hm);
-		auto funcsucc = v8script::init_v8_functions(hm);
+		auto use_inject_js = !std::filesystem::exists(std::filesystem::path(getModuleFilename().value()).replace_filename("disable.V8.Script.Run"));
+
+		auto funcsucc = use_inject_js && v8script::init_v8_functions(hm);
 		auto succ = stringsucc;
 		if (funcsucc)
 		{

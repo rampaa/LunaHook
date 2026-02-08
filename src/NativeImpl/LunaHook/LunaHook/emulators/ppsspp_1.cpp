@@ -32,7 +32,7 @@ namespace
     }
     void ULJM05659(TextBuffer *buffer, HookParam *hp)
     {
-        if (buffer->buff[buffer->size - 1] == ',')
+        if (buffer->data[buffer->size - 1] == ',')
             buffer->size -= 1;
     }
     void ULJS00403(TextBuffer *buffer, HookParam *hp)
@@ -348,6 +348,8 @@ namespace
                 {
                     if (*(uint8_t *)(address + i + 1) == 0xaa)
                         i += 2;
+                    else if (*(uint8_t *)(address + i + 4) == 0xaa)
+                        i += 5; // 下天の華 & fd
                     else
                         break;
                 }
@@ -373,6 +375,11 @@ namespace
                 {
                     s += ' ';
                     i += 1;
+                }
+                else if (c == 0x1)
+                {
+                    i += 1;
+                    continue;
                 }
                 else
                 {
@@ -494,7 +501,7 @@ namespace
         auto s = buffer->strA();
         s = s.substr(s.find("#n"));
         strReplace(s, "#n");
-        s = re::sub(s, R"((#[A-Za-z]+\[(\d*[.,])?\d+\])+)");
+        s = re::sub(s, R"(#[A-Za-z]+\[[\d\-,\.]*\])");
         buffer->from(s);
     }
     void NPJH50831_1(TextBuffer *buffer, HookParam *hp)
@@ -517,8 +524,24 @@ namespace
     {
         StringFilter(buffer, TEXTANDLEN("#n"));
         auto s = buffer->strA();
-        s = re::sub(s, R"((#[A-Za-z]+\[(\d*[.,])?\d+\])+)");
+        s = re::sub(s, R"(#[A-Za-z]+\[[\d\-,\.]*\])");
         buffer->from(s);
+    }
+    void ULJM06131(TextBuffer *buffer, HookParam *hp)
+    {
+        ULJM05943F(buffer, hp);
+        auto s = buffer->strA();
+        if (s[0] == ' ')
+            s = s.substr(1);
+        buffer->from(s);
+    }
+    void ULJM06196(TextBuffer *buffer, HookParam *hp)
+    {
+        if (!endWith(buffer->strA(), "#n"))
+        {
+            return buffer->clear();
+        }
+        ULJM05943F(buffer, hp);
     }
     void ULJM05783(TextBuffer *buffer, HookParam *hp)
     {
@@ -526,6 +549,12 @@ namespace
         if (!startWith(s, "#Speed[5]#Effect[0]#Scale[1]#"))
             return buffer->clear();
         ULJM05943F(buffer, hp);
+    }
+    void ULJM05975Name(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->viewA();
+        if (s.find("#n") != s.npos)
+            return buffer->clear();
     }
     void ULJM05867_1(TextBuffer *buffer, HookParam *hp)
     {
@@ -879,7 +908,7 @@ namespace
         static std::wstring last;
         if (startWith(ws, last))
         {
-            auto _ = ws.substr(last.size(), ws.size() - last.size());
+            auto _ = ws.substr(last.size());
             last = ws;
             ws = _;
         }
@@ -901,6 +930,12 @@ namespace
         ws = re::sub(ws, LR"(<(.*?),(.*?)>)", L"$1");
         strReplace(ws, L"^");
         buffer->fromWA(ws);
+    }
+    void ULJM06111(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        s = re::sub(s, R"(%N(\x81\x40)*)");
+        buffer->from(s);
     }
     void ULJM06129(TextBuffer *buffer, HookParam *hp)
     {
@@ -932,7 +967,7 @@ namespace
     {
         auto s = buffer->strA();
         s = re::sub(s, R"(#Ruby\[(.*?),(.*?)\])", "$1");
-        s = re::sub(s, R"((#[A-Za-z]+\[(\d*[.])?\d+\])+)");
+        s = re::sub(s, R"(#[A-Za-z]+\[[\d\-,\.]*\])");
         strReplace(s, "#n");
         strReplace(s, "\x84\xbd", "!?");
         buffer->from(s);
@@ -1039,7 +1074,7 @@ namespace
         static std::string last;
         if (startWith(s, last))
         {
-            auto _ = s.substr(last.size(), s.size() - last.size());
+            auto _ = s.substr(last.size());
             last = s;
             s = _;
         }
@@ -1072,6 +1107,13 @@ namespace
             CharFilter(buffer, '\n');
         else
             StringFilter(buffer, TEXTANDLEN("%C"));
+        static std::string last;
+        auto s = buffer->strA();
+        if (startWith(s, last))
+        {
+            buffer->from(s.substr(last.size()));
+        }
+        last = s;
     }
     void ULJM06040_1(TextBuffer *buffer, HookParam *hp)
     {
@@ -1417,6 +1459,12 @@ namespace
         s = s.substr(s.rfind("]") + 1);
         buffer->from(s);
     }
+    void ULJM06234(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        s = re::sub(s, R"(\n*\x81\x75.*?\x81\x76\x95\x5c\x8e\xa6\n*)");
+        buffer->from(s);
+    }
     void NPJH50836_1(TextBuffer *buffer, HookParam *hp)
     {
         auto s = buffer->strA();
@@ -1492,6 +1540,8 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // アラビアンズ・ロスト //ULJM06104
     // MEMORIES OFF //ULJM05334
 
+    // しろくまベルスターズ♪ ハッピー・ホリデーズ！
+    {0x88547A8, {FULL_STRING, 1, 0, 0, ULJM06111, "ULJM06111"}},
     // 恋花デイズ
     {0x883EA4C, {0, 0, 0, 0, ULJM06286, "ULJM06286"}},
     // 雨格子の館 PORTABLE 一柳和、最初の受難
@@ -1509,7 +1559,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 越えざるは紅い花　大河は未来を紡ぐ
     {0x8871340, {0, 5, 0, 0, 0, "NPJH50867"}}, // 需要自行将自定义人名占位符替换成自定义人名
     // 下天の華
-    {0x8915BB0, {0, 0, 0, ULJM05428, 0, "ULJM06234"}},
+    {0x8915BB0, {0, 0, 0, ULJM05428, ULJM06234, "ULJM06234"}},
     // 下天の華 夢灯り
     {0x8841B70, {0, 0, 0, ULJM05428, 0, "NPJH50864"}},
     // 忍び、恋うつつ
@@ -1525,7 +1575,8 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // Solomon's Ring ～火の章～
     {0x88061B0, {0, 2, 0, 0, ULJM06200, "ULJM06200"}},
     // 神なる君と
-    {0x888F054, {0, 0, 0, 0, ULJM06289, "ULJM05975"}},
+    {0x88F6660, {FULL_STRING, 3, 0, 0, ULJM06196, "ULJM05975"}},
+    {0x88F6648, {FULL_STRING, 0, 0, 0, ULJM05975Name, "ULJM05975"}},
     // DEARDROPS DISTORTION
     {0x8814110, {USING_CHAR | DATA_INDIRECT, 4, 0, 0, 0, "ULJM05819"}},
     // 流行り神ＰＯＲＴＡＢＬＥ
@@ -1632,11 +1683,11 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x88FB080, {0, 0, 0, 0, ULJM05867_1, "ULJM05867"}}, // TEXT
     {0x88FB0B8, {0, 0, 0, 0, ULJM05867_2, "ULJM05867"}}, // NAME
     // L.G.S～新説 封神演義～
-    {0x888A358, {0, 0, 0, 0, ULJM05943F, "ULJM06131"}}, // NAME+TEXT
-    {0x88DB214, {0, 0, 0, 0, ULJM05943F, "ULJM06131"}}, // TEXT
-    {0x889E970, {0, 0, 0, 0, ULJM05943F, "ULJM06131"}}, // NAME
+    {0x888A358, {FULL_STRING, 0, 0, 0, ULJM06131, "ULJM06131"}}, // NAME+TEXT
+    {0x88AF9AC, {FULL_STRING, 1, 0, 0, ULJM06131, "ULJM06131"}}, // PROLOG+NAME+TEXT
     // 源狼 GENROH
-    {0x8940DA8, {0, 1, 0, 0, ULJM06145, "ULJM06145"}}, // TEXT
+    {0x888E494, {FULL_STRING, 0, 0, 0, ULJM06145, "ULJM06145"}}, // TEXT
+    {0x890D51C, {FULL_STRING, 0, 0, 0, ULJM06145, "ULJM06145"}}, // 交易物语
     // 十鬼の絆 関ヶ原奇譚
     {0x891AAAC, {0, 0, 0, 0, ULJM06129, "ULJM06129"}}, // text
     {0x886E094, {0, 0, 0, 0, ULJM06129, "ULJM06129"}}, // name+text
@@ -1653,6 +1704,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x884DE44, {0, 0, 0, 0, NPJH50900, "NPJH50900"}}, // text
     // 青春はじめました！
     {0x880a744, {0, 0, 0, 0, ULJM05943F, std::vector<const char *>{"ULJM06302", "ULJM06303"}}},
+    {0x8804094, {FULL_STRING, 1, 0, 0, ULJM06344, std::vector<const char *>{"ULJM06302", "ULJM06303"}}},
     // アーメン・ノワール ポータブル
     {0x883b6a8, {0, 0, 0, 0, ULJM05943F, "ULJM06064"}},
     // デス・コネクション　ポータブル
@@ -1673,9 +1725,11 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // 新装版クローバーの国のアリス～Wonderful Wonder World～
     {0x8875E50, {0, 1, 0, 0, 0, "NPJH50894"}},
     // Glass Heart Princess
-    {0x885FA30, {0, 0, 0, 0, ULJM05943F, "ULJM06196"}},
+    {0x885FA30, {FULL_STRING, 0, 0, 0, ULJM05943F, "ULJM06196"}},
+    {0x8921A74, {FULL_STRING, 0, 0, 0, ULJM06196, "ULJM06196"}},
     // Glass Heart Princess:PLATINUM
-    {0x885D4F0, {0, 0, 0, 0, ULJM05943F, "ULJM06309"}},
+    {0x885D4F0, {FULL_STRING, 0, 0, 0, ULJM05943F, "ULJM06309"}},
+    {0x8921BF8, {FULL_STRING, 0, 0, 0, ULJM06196, "ULJM06309"}},
     // ウィル・オ・ウィスプ ポータブル
     {0x885DD04, {0, 0, 0, 0, ULJM05943F, "ULJM05447"}},
     // 華鬼 ～恋い初める刻 永久の印～

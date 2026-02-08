@@ -7,22 +7,41 @@
 #include <ctime>
 #include <filesystem>
 #include <shlwapi.h>
+#include <set>
+#include <optional>
 #include <atlbase.h>
+#include <fstream>
+#include <wincrypt.h>
+#include <wintrust.h>
+#include <softpub.h>
+#include <array>
 #include "../common.hpp"
+#include "checksigs.hpp"
+extern "C"
+{
+#include "WjCryptLib_Sha256.h"
+}
 
 #ifdef WIN10ABOVE
-#define RUNTIME L"runtime31264"
+#define RUNTIME L"runtime3.13-64"
 #else
 #ifdef WINXP
-#define RUNTIME L"runtime3432"
+#define RUNTIME L"runtime3.4-32"
 #else
 #ifdef _WIN64
-#define RUNTIME L"runtime3764"
+#define RUNTIME L"runtime3.7-64"
 #else
-#define RUNTIME L"runtime3732"
+#define RUNTIME L"runtime3.7-32"
 #endif
 #endif
 #endif
+
+#ifndef WINXP
+#define PYDLL L"python3.dll"
+#else
+#define PYDLL L"python34.dll"
+#endif
+
 #define FILES L"files\\"
 #define FILESRUNTIME FILES RUNTIME
 
@@ -39,6 +58,9 @@ PyStand::~PyStand()
 //---------------------------------------------------------------------
 PyStand::PyStand(const wchar_t *runtime)
 {
+	wchar_t path[MAX_PATH + 10];
+	GetModuleFileNameW(GetModuleHandle(0), path, MAX_PATH);
+	exepath = path;
 	_hDLL = NULL;
 	_Py_Main = NULL;
 	if (CheckEnviron(runtime) == false)
@@ -54,6 +76,7 @@ PyStand::PyStand(const wchar_t *runtime)
 //---------------------------------------------------------------------
 // init: _args, _argv, _cwd, _pystand, _home, _runtime,
 //---------------------------------------------------------------------
+
 bool PyStand::CheckEnviron(const wchar_t *rtp)
 {
 	// init: _args, _argv
@@ -61,11 +84,6 @@ bool PyStand::CheckEnviron(const wchar_t *rtp)
 	int argc;
 	_args = GetCommandLineW();
 	argvw = CommandLineToArgvW(_args.c_str(), &argc);
-	if (argvw == NULL)
-	{
-		MessageBoxA(NULL, "Error in CommandLineToArgvW()", "ERROR", MB_OK);
-		return false;
-	}
 	_argv.resize(argc);
 	for (int i = 0; i < argc; i++)
 	{
@@ -73,48 +91,34 @@ bool PyStand::CheckEnviron(const wchar_t *rtp)
 	}
 	LocalFree(argvw);
 
-	wchar_t path[MAX_PATH + 10];
-
-	// init: _pystand (full path of PyStand.exe)
-	GetModuleFileNameW(NULL, path, MAX_PATH + 1);
-#if 0
-	wsprintf(path, L"e:\\github\\tools\\pystand\\pystand.exe");
-#endif
-	_pystand = path;
-	_home = std::filesystem::path(path).parent_path().wstring();
+	_home = std::filesystem::path(exepath).parent_path().wstring();
 
 	SetCurrentDirectoryW(_home.c_str());
 
 	_runtime = (std::filesystem::path(_home) / rtp).wstring();
 
+	if (_runtime.find(LR"(\AppData\Local\Temp\)") != _runtime.npos)
+	{
+		std::wstring msg = L"请先解压后再运行！\nPlease decompress before running!";
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
+		return false;
+	}
 	// check home
 	if (!PathFileExistsW(_runtime.c_str()))
 	{
 		std::wstring msg = L"Missing embedded Python3 in:\n" + _runtime;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
 		return false;
 	}
-#ifndef WINXP
-	// check python3.dll
-	if (!PathFileExistsW((_runtime + L"\\python3.dll").c_str()))
+	if (!PathFileExistsW((_runtime + L"\\" + PYDLL).c_str()))
 	{
-		std::wstring msg = L"Missing python3.dll in:\r\n" + _runtime;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
+		std::wstring msg = std::wstring(L"Missing ") + PYDLL + L" in:\r\n" + _runtime;
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
 		return false;
 	}
-#else
-	if (!PathFileExistsW((_runtime + L"\\python34.dll").c_str()))
-	{
-		std::wstring msg = L"Missing python34.dll in:\r\n" + _runtime;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
-		return false;
-	}
-#endif
-	// setup environment
-	SetEnvironmentVariableW(L"PYSTAND", _pystand.c_str());
-	SetEnvironmentVariableW(L"PYSTAND_HOME", _home.c_str());
-	SetEnvironmentVariableW(L"PYSTAND_RUNTIME", _runtime.c_str());
 
+	if (!checkintegrity())
+		return false;
 	return true;
 }
 #ifndef WINXP
@@ -127,38 +131,30 @@ bool PyStand::CheckEnviron(const wchar_t *rtp)
 //---------------------------------------------------------------------
 bool PyStand::LoadPython()
 {
-	std::wstring runtime = _runtime;
-	std::wstring previous;
-
-	// save current directory
-	wchar_t path[MAX_PATH + 10];
-	GetCurrentDirectoryW(MAX_PATH + 1, path);
-	previous = path;
-
 	// python dll must be load under "runtime"
-	SetCurrentDirectoryW(runtime.c_str());
+	SetCurrentDirectoryW(_runtime.c_str());
 	// LoadLibrary
 
 #ifdef WIN10ABOVE
 	// win10版将runtime路径设为DLL搜索路径，优先使用自带的高级vcrt
 	//  这样，即使将主exe静态编译，也能加载runtime中的vcrt
 	SetDefaultDllDirectories(LOAD_LIBRARY_SEARCH_DEFAULT_DIRS);
-	SetDllDirectoryW(runtime.c_str());
+	SetDllDirectoryW(_runtime.c_str());
 #else
 	WCHAR env[65535];
 	GetEnvironmentVariableW(L"PATH", env, 65535);
-	auto newenv = std::wstring(env) + L";" + runtime;
+	auto newenv = std::wstring(env) + L";" + _runtime;
 #ifndef WINXP
 	// win7版优先使用系统自带的，系统没有再用自带的
 	;
 #else
 	// xp版把这些路径都加进去
-	newenv += L";" + runtime + L"Lib/site-packages/PyQt5";
+	newenv += L";" + _runtime + L"Lib/site-packages/PyQt5";
 #endif
 	SetEnvironmentVariableW(L"PATH", newenv.c_str());
 #endif
 
-	std::wstring pydll = runtime + L"\\" + PYDLL;
+	std::wstring pydll = _runtime + L"\\" + PYDLL;
 	_hDLL = (HINSTANCE)LoadLibraryW(pydll.c_str());
 	if (_hDLL)
 	{
@@ -166,19 +162,19 @@ bool PyStand::LoadPython()
 	}
 
 	// restore director
-	SetCurrentDirectoryW(previous.c_str());
+	SetCurrentDirectoryW(_home.c_str());
 
 	if (_hDLL == NULL)
 	{
-		std::wstring msg = L"Cannot load python3.dll from:\r\n" + runtime;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
+		std::wstring msg = L"Cannot load python3.dll from:\r\n" + _runtime;
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
 		return false;
 	}
 	else if (_Py_Main == NULL)
 	{
 		std::wstring msg = L"Cannot find Py_Main() in:\r\n";
 		msg += pydll;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
 		return false;
 	}
 	return true;
@@ -228,36 +224,15 @@ int PyStand::RunString(const wchar_t *script)
 //---------------------------------------------------------------------
 int PyStand::DetectScript()
 {
-	// init: _script (init script like PyStand.int or PyStand.py)
-	int size = (int)_pystand.size() - 1;
-	for (; size >= 0; size--)
-	{
-		if (_pystand[size] == L'.')
-			break;
-	}
-	if (size < 0)
-		size = (int)_pystand.size();
-	std::wstring main = _pystand.substr(0, size);
-	std::vector<const wchar_t *> exts;
-	std::vector<std::wstring> scripts;
-	_script.clear();
-
-	std::wstring test;
-	test = _home + L"\\LunaTranslator\\main.py";
-	if (PathFileExistsW(test.c_str()))
-	{
-		_script = test;
-	}
-	if (_script.empty())
+	std::wstring test = _home + L"\\LunaTranslator\\main.py";
+	if (!PathFileExistsW(test.c_str()))
 	{
 		std::wstring msg = L"Can't find :\r\n" + test;
-		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK);
+		MessageBoxW(NULL, msg.c_str(), L"ERROR", MB_OK | MB_SYSTEMMODAL);
 		return -1;
 	}
-	SetEnvironmentVariableW(L"PYSTAND_SCRIPT", _script.c_str());
-	std::vector<wchar_t> buffer(MAX_PATH);
-	GetModuleFileNameW(GetModuleHandle(0), buffer.data(), MAX_PATH);
-	SetEnvironmentVariableW(L"LUNA_EXE_NAME", buffer.data());
+	SetEnvironmentVariableW(L"PYSTAND_SCRIPT", test.c_str());
+	SetEnvironmentVariableW(L"LUNA_EXE_NAME", exepath.c_str());
 	return 0;
 }
 
@@ -267,17 +242,12 @@ int PyStand::DetectScript()
 const auto init_script =
 	LR"(
 import os,functools, locale, sys
-PYSTAND = os.environ['PYSTAND']
-PYSTAND_HOME = os.environ['PYSTAND_HOME']
-PYSTAND_RUNTIME = os.environ['PYSTAND_RUNTIME']
 PYSTAND_SCRIPT = os.environ['PYSTAND_SCRIPT']
 sys.path_origin = [n for n in sys.path]
-sys.PYSTAND = PYSTAND
-sys.PYSTAND_HOME = PYSTAND_HOME
 sys.PYSTAND_SCRIPT = PYSTAND_SCRIPT
 def MessageBox(msg, info = 'Message'):
     import ctypes
-    ctypes.windll.user32.MessageBoxW(None, str(msg), str(info), 0)
+    ctypes.windll.user32.MessageBoxW(None, str(msg), str(info), 0x50000)
     return 0
 os.MessageBox = MessageBox
 #sys.stdout=sys.stderr
@@ -352,7 +322,250 @@ exec(code, environ)
 //! prebuild: windres resource.rc -o resource.o
 //! mode: win
 //! int: objs
+SHA256_HASH Sha256Digest(const std::vector<uint8_t> &str)
+{
+	Sha256Context sha256Context;
+	SHA256_HASH sha256Hash;
+	uint16_t i;
+	Sha256Initialise(&sha256Context);
+	Sha256Update(&sha256Context, str.data(), str.size());
+	Sha256Finalise(&sha256Context, &sha256Hash);
+	return sha256Hash;
+}
+std::optional<std::vector<uint8_t>> readFile(const std::wstring &filename)
+{
+	std::ifstream file(filename, std::ios::binary);
+	if (!file)
+		return {};
+	// 使用迭代器读取文件内容到vector
+	std::vector<uint8_t> buffer(
+		(std::istreambuf_iterator<char>(file)),
+		std::istreambuf_iterator<char>());
 
+	return buffer;
+}
+
+// 辅助函数：提取文件签名证书中的公钥数据
+std::optional<std::vector<BYTE>> GetCertificatePublicKey(const wchar_t *filePath)
+{
+	HCERTSTORE hStore = NULL;
+	HCRYPTMSG hMsg = NULL;
+	DWORD dwEncoding = 0;
+	DWORD dwContentType = 0;
+	DWORD dwFormatType = 0;
+
+	// 1. 从文件中查询加密对象（获取签名信息）
+	BOOL bRes = CryptQueryObject(
+		CERT_QUERY_OBJECT_FILE,
+		filePath,
+		CERT_QUERY_CONTENT_FLAG_PKCS7_SIGNED_EMBED,
+		CERT_QUERY_FORMAT_FLAG_BINARY,
+		0,
+		&dwEncoding,
+		&dwContentType,
+		&dwFormatType,
+		&hStore,
+		&hMsg,
+		NULL);
+
+	if (!bRes)
+		return {};
+
+	// 2. 获取 Signer Info 的大小
+	DWORD dwSignerInfoSize = 0;
+	if (!CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, NULL, &dwSignerInfoSize))
+	{
+		if (hStore)
+			CertCloseStore(hStore, 0);
+		if (hMsg)
+			CryptMsgClose(hMsg);
+		return {};
+	}
+
+	// 3. 获取 Signer Info
+	std::vector<BYTE> signerInfoBuf(dwSignerInfoSize);
+	PCMSG_SIGNER_INFO pSignerInfo = (PCMSG_SIGNER_INFO)signerInfoBuf.data();
+	std::vector<BYTE> result;
+	if (CryptMsgGetParam(hMsg, CMSG_SIGNER_INFO_PARAM, 0, pSignerInfo, &dwSignerInfoSize))
+	{
+
+		// 4. 根据 Signer Info 中的 SerialNumber 和 Issuer 在 Store 中查找证书
+		CERT_INFO CertInfo = {0};
+		CertInfo.Issuer = pSignerInfo->Issuer;
+		CertInfo.SerialNumber = pSignerInfo->SerialNumber;
+
+		PCCERT_CONTEXT pCertContext = CertFindCertificateInStore(
+			hStore,
+			dwEncoding,
+			0,
+			CERT_FIND_SUBJECT_CERT,
+			(PVOID)&CertInfo,
+			NULL);
+
+		if (pCertContext)
+		{
+			// ==============================================================
+			// 核心部分：提取公钥信息 (SubjectPublicKeyInfo)
+			// ==============================================================
+			// PublicKey 位于 pCertContext->pCertInfo->SubjectPublicKeyInfo
+			// 包含了算法 OID 和 公钥的二进制数据。
+			// 我们需要比较整个 PublicKeyInfo 的编码数据，或者单独比较 PublicKey.pbData
+
+			// 这里我们直接拷贝公钥的二进制流
+			DWORD keyLen = pCertContext->pCertInfo->SubjectPublicKeyInfo.PublicKey.cbData;
+			BYTE *keyPtr = pCertContext->pCertInfo->SubjectPublicKeyInfo.PublicKey.pbData;
+
+			if (keyLen > 0 && keyPtr != NULL)
+			{
+				result.assign(keyPtr, keyPtr + keyLen);
+			}
+
+			CertFreeCertificateContext(pCertContext);
+		}
+	}
+
+	if (hStore)
+		CertCloseStore(hStore, 0);
+	if (hMsg)
+		CryptMsgClose(hMsg);
+
+	return result;
+}
+bool VerifyFileSignature(const wchar_t *filePath)
+{
+	WINTRUST_FILE_INFO fileInfo = {0};
+	fileInfo.cbStruct = sizeof(WINTRUST_FILE_INFO);
+	fileInfo.pcwszFilePath = filePath;
+
+	WINTRUST_DATA trustData = {0};
+	trustData.cbStruct = sizeof(WINTRUST_DATA);
+	trustData.dwUIChoice = WTD_UI_NONE;
+	trustData.fdwRevocationChecks = WTD_REVOKE_NONE;
+	trustData.dwUnionChoice = WTD_CHOICE_FILE;
+	trustData.pFile = &fileInfo;
+	trustData.dwStateAction = WTD_STATEACTION_VERIFY;
+	// 只检查签名有效，不检查签名源
+	trustData.dwProvFlags = WTD_REVOCATION_CHECK_NONE | WTD_HASH_ONLY_FLAG;
+	GUID policyGuid = WINTRUST_ACTION_GENERIC_VERIFY_V2;
+	LONG lStatus = WinVerifyTrust(NULL, &policyGuid, &trustData);
+
+	trustData.dwStateAction = WTD_STATEACTION_CLOSE;
+	WinVerifyTrust(NULL, &policyGuid, &trustData);
+
+	return lStatus == ERROR_SUCCESS;
+}
+
+bool VerifyKeyMatchesSelf(const wchar_t *filePath, const std::optional<std::vector<uint8_t>> &selfKey)
+{
+	if (!VerifyFileSignature(filePath))
+		return false;
+	auto targetKey = GetCertificatePublicKey(filePath);
+	if (!selfKey || !targetKey)
+		return false;
+
+	if (selfKey.value().size() != targetKey.value().size())
+		return false;
+	return memcmp(selfKey.value().data(), targetKey.value().data(), selfKey.value().size()) == 0;
+}
+
+std::set<const wchar_t *> PyStand::checkintegrity_(int &succ)
+{
+	// 分别对python代码检查hash，对exe/dll检查签名
+	std::set<const wchar_t *> collect;
+
+	auto selfKey = GetCertificatePublicKey(exepath.c_str());
+	if (selfKey)
+	{
+		if (!VerifyFileSignature(exepath.c_str()))
+		{
+			succ = -1;
+			return {};
+		}
+		for (auto &&fn : checksig)
+		{
+			// 验证是否签名，且必须和自己签名相同
+			if (!fn)
+				continue;
+			if (!VerifyKeyMatchesSelf(fn, selfKey))
+				collect.insert(fn);
+		}
+	}
+	for (auto &&[fn, sig] : checkdigest)
+	{
+		if (!fn)
+			continue;
+		auto f = readFile(fn);
+		if (!f)
+		{
+			succ = -2;
+			collect.insert(fn);
+			continue;
+		}
+		auto sigf = Sha256Digest(f.value());
+		if (memcmp(sigf.bytes, sig.data(), sig.size()))
+			collect.insert(fn);
+	}
+	return collect;
+}
+bool PyStand::checkintegrity()
+{
+	int succ = 1;
+	auto invalidfiles = checkintegrity_(succ);
+	if (succ == -1)
+	{
+		std::wstringstream ss;
+		ss << L"主程序已被篡改，无法运行 ！";
+		ss << L"\n";
+		ss << L"The main program has been tampered with and cannot run!";
+		MessageBoxW(0, ss.str().c_str(), L"Error", MB_SYSTEMMODAL);
+		return false;
+	}
+	else if (succ == -2)
+	{
+		std::wstringstream ss;
+		ss << L"部分文件丢失，无法运行 ！";
+		ss << L"\n";
+		ss << L"Some program files lost, cannot run!";
+		MessageBoxW(0, ss.str().c_str(), L"Error", MB_SYSTEMMODAL);
+		return false;
+	}
+	if (invalidfiles.size())
+	{
+		// 检查到无效文件时，仍执行，但弹窗警告。
+		std::wstringstream ss;
+		ss << L"部分文件可能已被篡改，是否仍要运行？";
+		ss << L"\n";
+		ss << L"Some files may have been altered. Do you still want to run it?";
+		if (0)
+		{
+			int idx = 1;
+			for (auto &f : invalidfiles)
+			{
+				// 前十个和最后一个显示名称，中间显示一个省略号
+				if (idx == invalidfiles.size() || idx < 10)
+				{
+					ss << L"\n";
+					ss << idx;
+					ss << L". ";
+					ss << f;
+				}
+				else if (idx == 10)
+				{
+					ss << L"\n";
+					ss << L"...";
+				}
+				else if (idx > 10)
+				{
+				}
+				idx++;
+			}
+		}
+		auto checked = MessageBoxW(0, ss.str().c_str(), L"Warning", MB_YESNO | MB_ICONQUESTION | MB_SYSTEMMODAL);
+		if (checked != IDYES)
+			return false;
+	}
+	return true;
+}
 int main()
 {
 	{
@@ -372,8 +585,9 @@ int main()
 	// 但因为无法区分是使用cmd打开debug还是双击打开debug，所以干脆都这样吧。
 	if (AttachConsole(ATTACH_PARENT_PROCESS))
 	{
-		freopen("CONOUT$", "w", stdout);
-		freopen("CONOUT$", "w", stderr);
+		FILE *stream = nullptr;
+		freopen_s(&stream, "CONOUT$", "w", stdout);
+		freopen_s(&stream, "CONOUT$", "w", stderr);
 	}
 	int hr = ps.RunString(init_script);
 	return hr;

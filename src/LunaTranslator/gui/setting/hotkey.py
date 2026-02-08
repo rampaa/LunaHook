@@ -82,7 +82,7 @@ liandianqi_stoped = True
 
 def invoke_liandianqi_or_stop():
     global liandianqi_stoped
-    key = globalconfig.get("liandianqi_vkey")
+    key = globalconfig.get("liandianqi_vkey", vkcode_map[list(vkcode_map.keys())])
     if not key:
         return
     interval = globalconfig.get("liandianqi_interval", 1)
@@ -214,7 +214,7 @@ def registrhotkeys(self):
         "_15": gobject.base.translation_ui.bindcropwindow_signal.emit,
         "_16": gobject.base.translation_ui.showhideuisignal.emit,
         "_17": gobject.base.translation_ui.quitf_signal.emit,
-        "_21": grabwindow,
+        "_21": lambda: grabwindow(screenshot=True),
         "_22": gobject.base.translation_ui.muteprocessignal.emit,
         "41": lambda: gobject.base.translation_ui.fullsgame_signal.emit(False),
         "42": lambda: gobject.base.translation_ui.fullsgame_signal.emit(True),
@@ -247,6 +247,7 @@ def registrhotkeys(self):
         "48": lambda: _ocr_focus_switch_near(),
         "49": lambda: _ocr_focus_No(),
         "50": safesaveall,
+        "51": lambda: gobject.base.translation_ui.changemousetransparentstate(1),
     }
 
     for name in globalconfig["myquickkeys"]:
@@ -268,6 +269,7 @@ hotkeys = [
             "_51",
             "_6",
             "_8",
+            "51",
             "_9",
             "38",
             "_16",
@@ -492,11 +494,11 @@ def regist_or_not_key(self, name, _=None):
 
     if name in self.registok:
         NativeUtils.UnRegisterHotKey(self.registok[name])
-    __ = globalconfig["quick_setting"]["all"].get(name)
+    __: dict = globalconfig["quick_setting"]["all"].get(name)
     if not __:
         return
-    keystring = __["keystring"]
-    if keystring == "" or (not (__["use"] and globalconfig["quick_setting"]["use"])):
+    keystring = __.get("keystring")
+    if (not keystring) or (not (__.get("use") and globalconfig["quick_setting"]["use"])):
         return
 
     try:

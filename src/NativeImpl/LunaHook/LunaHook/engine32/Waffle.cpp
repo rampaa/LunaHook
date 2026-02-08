@@ -23,7 +23,7 @@ bool InsertWaffleDynamicHook(LPVOID addr, hook_context *context)
   // jichi 9/30/2013: Fix the bug in ITH logic where j is uninitialized
   for (i = processStartAddress + 0x1000; i < processStopAddress - 4; i++)
     if (*id == handler && *(ib - 1) == 0x68)
-      if (DWORD t = SafeFindEnclosingAlignedFunction(i, 0x40))
+      if (DWORD t = MemDbg::findEnclosingAlignedFunction(i, 0x40))
       {
         HookParam hp;
         hp.address = t;
@@ -187,7 +187,7 @@ namespace
         // auto sig = Engine::hashThreadSignature(role, reladdr);
         buffer->from(arg->view());
       }
-      void hookafter(hook_context *s, TextBuffer buffer)
+      void hookafter(hook_context *s, TextBuffer buffer, HookParam *)
       {
 
         auto newData = buffer.viewA();
@@ -669,7 +669,7 @@ namespace
     hp.filter_fun = filterline;
     hp.embed_hook_font = F_TextOutA | F_GetTextExtentPoint32A;
     hp.type = EMBED_ABLE | USING_STRING | EMBED_DYNA_SJIS;
-    hp.embed_fun = [](hook_context *context, TextBuffer buffer)
+    hp.embed_fun = [](hook_context *context, TextBuffer buffer, HookParam *)
     {
       ((TextUnionA *)context->stack[1])->setText(buffer.viewA());
     };

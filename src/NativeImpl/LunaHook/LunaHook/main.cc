@@ -97,8 +97,10 @@ void CommunicationInitialize(HANDLE hostPipe, HANDLE hookPipe, bool &running)
 {
 	// 1. hook->host
 	// WORD[4] version
+	// GUID
 	DWORD count;
 	WriteFile(hookPipe, LUNA_VERSION, sizeof(LUNA_VERSION), &count, nullptr);
+	WriteFile(hookPipe, &compatible_sig, sizeof(compatible_sig), &count, nullptr);
 	// 2. hook->host && host->hook
 	// i18n key & result
 	for (auto &[_en, data] : TR.get_hook())
@@ -173,7 +175,7 @@ void HostInfo(HOSTINFO type, LPCWSTR text, ...)
 	va_list args;
 	va_start(args, text);
 	buffer.type = type;
-	_vsnwprintf(buffer.message, MESSAGE_SIZE, text, args);
+	_vsnwprintf_s(buffer.message, _TRUNCATE, MESSAGE_SIZE, text, args);
 	WriteFile(hookPipe, &buffer, sizeof(buffer), DUMMY, nullptr);
 }
 Synchronized<std::unordered_map<uintptr_t, std::wstring>> modulecache;
@@ -221,7 +223,7 @@ void NotifyHookRemove(uint64_t addr, LPCSTR name)
 void NotifyHookInserting(uint64_t addr, wchar_t hookcode[])
 {
 	HookInsertingNotif buffer(addr);
-	wcscpy(buffer.hookcode, hookcode);
+	wcscpy_s(buffer.hookcode, ARRAYSIZE(buffer.hookcode), hookcode);
 	WriteFile(hookPipe, &buffer, sizeof(buffer), DUMMY, nullptr);
 }
 BOOL WINAPI DllMain(HINSTANCE hModule, DWORD fdwReason, LPVOID)
@@ -236,9 +238,9 @@ BOOL WINAPI DllMain(HINSTANCE hModule, DWORD fdwReason, LPVOID)
 			return FALSE;
 		DisableThreadLibraryCalls(hModule);
 
-		auto createfm = [](AutoHandle<> &handle, void **ptr, DWORD sz, std::wstring &name)
+		auto createfm = [](AutoHandle<> &handle, void **ptr, DWORD sz, const std::wstring &name)
 		{
-			handle = CreateFileMappingW(INVALID_HANDLE_VALUE, &allAccess, PAGE_EXECUTE_READWRITE, 0, sz, (name).c_str());
+			handle = CreateFileMappingW(INVALID_HANDLE_VALUE, &allAccess, PAGE_EXECUTE_READWRITE, 0, sz, name.c_str());
 			*ptr = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS | FILE_MAP_EXECUTE, 0, 0, sz);
 			memset(*ptr, 0, sz);
 		};
@@ -300,7 +302,7 @@ void jitaddraddr(uint64_t em_addr, uintptr_t jitaddr, JITTYPE jittype)
 #endif
 	jitaddr2emuaddr[jitaddr] = {jittype, em_addr};
 }
-bool NewHook_1(HookParam &hp, LPCSTR lpname)
+bool NewHook_1(HookParam &hp, LPCSTR lpname, bool silentlyfail = false)
 {
 	if (++currentHook >= MAX_HOOK)
 	{
@@ -313,7 +315,8 @@ bool NewHook_1(HookParam &hp, LPCSTR lpname)
 	wcscpy_s(hp.hookcode, HOOKCODE_LEN, HookCode::Generate(hp, GetCurrentProcessId()).c_str());
 	if (!(*hooks)[currentHook].Insert(hp))
 	{
-		ConsoleOutput(TR[InsertHookFailed], WideStringToString(hp.hookcode).c_str());
+		if (!silentlyfail)
+			ConsoleOutput(TR[InsertHookFailed], WideStringToString(hp.hookcode).c_str());
 		(*hooks)[currentHook].Clear();
 		return false;
 	}
@@ -346,10 +349,10 @@ void delayinsertNewHook(uint64_t em_address)
 #ifdef _WIN64
 bool PCSX2_UserHook_delayinsert(uint32_t);
 #endif
-bool NewHook(HookParam hp, LPCSTR name)
+bool NewHook(HookParam hp, LPCSTR name, bool silentlyfail)
 {
 	if (hp.address || hp.jittype == JITTYPE::PC)
-		return NewHook_1(hp, name);
+		return NewHook_1(hp, name, silentlyfail);
 	if (hp.jittype == JITTYPE::UNITY)
 	{
 		auto spls = strSplit(hp.function, ":");
@@ -374,7 +377,7 @@ bool NewHook(HookParam hp, LPCSTR name)
 			ConsoleOutput("not find");
 			return false;
 		}
-		return NewHook_1(hp, name);
+		return NewHook_1(hp, name, silentlyfail);
 	}
 	std::lock_guard _(maplock);
 // 下面的是手动插入
@@ -384,7 +387,7 @@ bool NewHook(HookParam hp, LPCSTR name)
 		if (hp.type & DIRECT_READ)
 		{
 			hp.address = PCSX2Types::emu_addr(hp.emu_addr);
-			return NewHook_1(hp, name);
+			return NewHook_1(hp, name, silentlyfail);
 		}
 		else if (PCSX2_UserHook_delayinsert(hp.emu_addr))
 			return true;
@@ -403,8 +406,8 @@ bool NewHook(HookParam hp, LPCSTR name)
 			return true;
 		}
 	}
-	strcpy(hp.function, "");
-	wcscpy(hp.module, L"");
+	strcpy_s(hp.function, ARRAYSIZE(hp.function), "");
+	wcscpy_s(hp.module, ARRAYSIZE(hp.module), L"");
 	hp.type &= ~MODULE_OFFSET;
 
 	hp.jittype = emuaddr2jitaddr[hp.emu_addr].first;
@@ -413,18 +416,18 @@ bool NewHook(HookParam hp, LPCSTR name)
 	for (auto addr : emuaddr2jitaddr[hp.emu_addr].second)
 	{
 		hp.address = addr;
-		succ |= NewHook_1(hp, name);
+		succ |= NewHook_1(hp, name, silentlyfail);
 	}
 	return succ;
 #else
 	hp.address = emuaddr2jitaddr[hp.emu_addr].second;
-	return NewHook_1(hp, name);
+	return NewHook_1(hp, name, silentlyfail);
 #endif
 }
 
 bool NewHookRetry(HookParam hp, LPCSTR name)
 {
-	if (NewHook(hp, name))
+	if (NewHook(hp, name, true))
 		return true;
 	if (hp.type & BREAK_POINT)
 		return false;

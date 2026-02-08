@@ -6,6 +6,7 @@ from qtsymbols import *
 from traceback import print_exc
 from myutils.config import (
     _TR,
+    dynamiclink,
     globalconfig,
     static_data,
     getlanguse,
@@ -16,6 +17,7 @@ from myutils.config import (
     gamepath2uid_index,
     defaultglobalconfig,
     dynamicapiname,
+    urlpathjoin,
 )
 from myutils.keycode import vkcode_map, mod_map
 from language import Languages, TransLanguages
@@ -24,7 +26,6 @@ import re, heapq, NativeUtils
 from myutils.wrapper import tryprint, threader
 from html.parser import HTMLParser
 from myutils.audioplayer import bass_code_cast
-from urllib.parse import urlparse
 
 
 class localcachehelper:
@@ -66,20 +67,6 @@ def qimage2binary(qimage: QImage, fmt="BMP") -> bytes:
     return image_data
 
 
-def checkisusingwine() -> bool:
-    iswine = True
-    try:
-        winreg.OpenKeyEx(
-            winreg.HKEY_CURRENT_USER,
-            r"Software\Wine",
-            0,
-            winreg.KEY_QUERY_VALUE,
-        )
-    except FileNotFoundError:
-        iswine = False
-    return iswine
-
-
 def __internal__getlang(k1: str, k2: str) -> str:
     try:
         for _ in (0,):
@@ -106,19 +93,39 @@ def __translate_exits(fanyi):
     return None
 
 
-def translate_exits(fanyi, which=False):
+def translate_exits(fanyi, only_copy=False):
     # 不再加载废弃接口，以免煞笔问煞笔问题。
     _ = __translate_exits(fanyi)
 
     isdeprecated = (0 == _) and (
         (fanyi not in defaultglobalconfig["fanyi"]) and fanyi != "chatgpt-offline"
     )
-    if which:
-        if isdeprecated:
-            return None
-        return _
-    else:
-        return _ is not None
+    if isdeprecated:
+        return None
+    if _ is None:
+        return None
+    elif _ == 0 and (not only_copy):
+        return "translator." + fanyi
+    elif _ == 1:
+        return "copyed." + fanyi
+
+
+def useExCheck(fanyi, which=None, key="fanyi"):
+    # 当且仅当 useEx 调用并返回 False 时返回 False
+    useExfunction = globalconfig[key][fanyi].get("useEx")
+    if not useExfunction:
+        return True
+    if which is None:
+        which = translate_exits(fanyi)
+    if not which:
+        return True
+    try:
+        if not getattr(importlib.import_module(which), useExfunction)():
+            return False
+    except:
+        print_exc()
+        pass
+    return True
 
 
 def all_langs(src=True):
@@ -415,7 +422,9 @@ def is_port_listening(host, port):
         return False
 
 
-def stringfyerror(e: Exception):
+def stringfyerror(e: "Exception|str"):
+    if isinstance(e, str):
+        return e
     if e.args and isinstance(e.args[0], requests.Response):
         from myutils.commonbase import maybejson
 
@@ -424,11 +433,11 @@ def stringfyerror(e: Exception):
             e.args[0].reason,
             str(maybejson(e.args[0])).replace("\n", " ").replace("\r", ""),
         )
-    error = str(type(e))[8:-2] + " " + str(e)
+    error = str(e)
     if len(error.splitlines()) > 5:
         error = error.replace("\n", " ").replace("\r", "")
 
-    if isinstance(e, requests.RequestException):
+    if isinstance(e, requests.exceptions.RequestException):
         error = _TR("网络错误") + ": " + error
         if e.proxy:
             try:
@@ -472,16 +481,17 @@ def splittranslatortypes():
     return ls
 
 
-def splitocrtypes(dic):
-    offline, online = [], []
+def splitocrtypes(dic, other=False):
+    offline, online, other = [], [], []
     for k in dic:
         try:
-            {"online": online, "offline": offline}[dic[k].get("type", "online")].append(
-                k
-            )
+            {"online": online, "offline": offline, "other": other}[
+                dic[k].get("type", "online")
+            ].append(k)
         except:
             pass
-
+    if other:
+        return offline, online, other
     return offline, online
 
 
@@ -505,16 +515,6 @@ def selectdebugfile(path: str, ismypost=False, ishotkey=False, istts=False):
         )
     NativeUtils.OpenFileEx(os.path.normpath(p))
     return p
-
-
-def dynamiclink(text: str = "", docs=False) -> str:
-    base = static_data[("main_server", "docs_server")[docs]][
-        [gobject.serverindex, gobject.serverindex2][docs]
-    ]
-    _ = [base, text]
-    if docs:
-        _.insert(1, str(getlanguse()))
-    return urlpathjoin(*_)
 
 
 def makehtml(text: str, show=None, docs=False) -> str:
@@ -558,10 +558,7 @@ def safe_escape(string: str) -> str:
 
 
 def case_insensitive_replace(text: str, old: str, new: str) -> str:
-    def replace_match(_):
-        return new
-
-    return re.sub(re.escape(old), replace_match, text, flags=re.IGNORECASE)
+    return re.sub(re.escape(old), lambda _: new, text, flags=re.IGNORECASE)
 
 
 @tryprint
@@ -569,23 +566,20 @@ def parsemayberegexreplace(lst: "list[dict]", line: str) -> str:
     if not line:
         line = ""
     for fil in lst:
-        regex = fil.get("regex", False)
-        escape = fil.get("escape", regex)
         key = fil.get("key", "")
-        value = fil.get("value", "")
-        if key == "":
+        if not key:
             continue
-        if regex:
-            if escape:
-                line = re.sub(safe_escape(key), safe_escape(value), line)
-            else:
-                line = re.sub(key, value, line)
-        else:
-            if escape:
-                line = line.replace(safe_escape(key), safe_escape(value))
-            else:
-                line = line.replace(key, value)
-
+        value = fil.get("value", "")
+        if fil.get("escape", False):
+            key = safe_escape(key)
+            value = safe_escape(value)
+        if not fil.get("regex", False):
+            key = re.escape(key)
+            value = functools.partial((lambda value, _: value), value)
+        if fil.get("whole-word", False):
+            key = r"\b" + key + r"\b"
+        flags = 0 if fil.get("case-sensitive", False) else re.IGNORECASE
+        line = re.sub(key, value, line, flags=flags)
     return line
 
 
@@ -875,17 +869,6 @@ def checkv1(api_url: str):
         return api_url + "/v1"
 
 
-def urlpathjoin(*argc: str):
-    urlx = []
-    for i, u in enumerate(argc):
-        if u.startswith("/") and i != 0:
-            u = u[1:]
-        if u.endswith("/") and i != len(argc) - 1:
-            u = u[:-1]
-        urlx.append(u)
-    return "/".join(urlx)
-
-
 def createurl(url: str, checkend="/chat/completions"):
     if "openai.azure.com/openai/deployments/" in url:
         return url
@@ -1027,9 +1010,14 @@ def common_create_gemini_request(
         # https://ai.google.dev/gemini-api/docs/thinking?hl=zh-cn#set-budget
         gen_config.update(
             thinkingConfig=dict(
-                thinkingBudget={"low": 512, "medium": -1, "high": 24576, "minimal": 0}[
-                    config["reasoning_effort"]
-                ]
+                thinkingBudget={
+                    "low": 512,
+                    "medium": -1,
+                    "high": 24576,
+                    "xhigh": 24576,
+                    "minimal": 0,
+                    "none": 0,
+                }[config["reasoning_effort"]]
             )
         )
     model: str = config["model"]
@@ -1264,3 +1252,37 @@ def is_ascii_symbo(c: str):
 def is_ascii_control(c: str):
     # 不要管\r\n
     return cinranges(c, (0, 0x9), (0xB, 0xC), (0xE, 0x1F), (0x7F, 0xA0))
+
+
+def format_bytes(bytes_num: int, precision: int = 2) -> str:
+    if not bytes_num:
+        return "0 B"
+    if not isinstance(bytes_num, (int, float)):
+        try:
+            bytes_num = float(bytes_num)
+        except:
+            return "0 B"
+    bytes_num = abs(bytes_num)
+
+    units = ["B", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB"]
+
+    if bytes_num == 0:
+        return "0 " + str(units[0])
+
+    unit_index = 0
+    while bytes_num >= 1000 and unit_index < len(units) - 1:
+        bytes_num /= 1024
+        unit_index += 1
+
+    if unit_index == 0:
+        return "{} {}".format(int(bytes_num), units[unit_index])
+    else:
+
+        formatted = str(round(bytes_num, precision))
+
+        if formatted.endswith(".00"):
+            formatted = formatted[:-3]
+        elif formatted.endswith(".0"):
+            formatted = formatted[:-2]
+
+        return "{} {}".format(formatted, units[unit_index])

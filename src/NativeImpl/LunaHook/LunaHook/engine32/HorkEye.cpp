@@ -156,7 +156,7 @@
 // ex:【夏偾,S005_B_0002】「バーッ�ク
 static void HorkEyeFilter(TextBuffer *buffer, HookParam *)
 {
-  char *str = reinterpret_cast<char *>(buffer->buff),
+  char *str = reinterpret_cast<char *>(buffer->data),
        *start,
        *stop;
 
@@ -216,7 +216,7 @@ namespace
     buffer->from(old);
   }
   template <int offset = 1>
-  void hookafter(hook_context *s, TextBuffer buffer)
+  void hookafter(hook_context *s, TextBuffer buffer, HookParam *)
   {
 
     auto newData = buffer.strA();
@@ -259,7 +259,6 @@ bool InsertHorkEyeHook()
     hp.embed_fun = hookafter<-4 - 1>;
     hp.filter_fun = HorkEyeFilter;
     hp.lineSeparator = L"[n]";
-    ConsoleOutput("INSERT HorkEye");
 
     return NewHook(hp, "HorkEye");
   }
@@ -275,7 +274,7 @@ bool InsertHorkEyeHook()
           0x03, 0xc0       // add eax,eax
       };
 
-  for (auto addr : Util::SearchMemory(bytes2, sizeof(bytes2), PAGE_EXECUTE_READWRITE, processStartAddress, processStopAddress))
+  for (auto addr : MemDbg::findBytesAll(bytes2, sizeof(bytes2), processStartAddress, processStopAddress))
   {
     HookParam hp;
     hp.address = addr;
@@ -287,7 +286,6 @@ bool InsertHorkEyeHook()
     return NewHook(hp, "HorkEye2");
   }
 
-  ConsoleOutput("HorkEye: pattern not found");
   return false;
 }
 

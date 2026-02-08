@@ -3,8 +3,8 @@ from qtsymbols import *
 from ctypes import Structure, memmove, c_longlong, c_int, c_float, c_int32, c_int64
 from ocrengines.baseocrclass import baseocr, OCRResult
 import os, zipfile, shutil
-from myutils.utils import dynamiclink, stringfyerror
-from myutils.config import _TR
+from myutils.utils import stringfyerror, format_bytes
+from myutils.config import _TR, dynamiclink
 import gobject, requests
 from traceback import print_exc
 from myutils.wrapper import threader
@@ -82,14 +82,14 @@ class question(QWidget):
         self.skiplink2 = True
         target = gobject.gettempdir(saves[-1][2])
         with open(target, "wb") as ff:
+            asize = format_bytes(size)
             for _ in req.iter_content(chunk_size=1024 * 32):
                 ff.write(_)
                 file_size += len(_)
                 prg = int(10000 * file_size / size)
                 prg100 = prg / 100
-                sz = int(1000 * (int(size / 1024) / 1024)) / 1000
                 self.progresssetval.emit(
-                    _TR("总大小_{} MB _进度_{:0.2f}%").format(sz, prg100),
+                    _TR("总大小_{} _进度_{:0.2f}%").format(asize, prg100),
                     prg,
                 )
 
@@ -147,14 +147,14 @@ class question(QWidget):
         size = int(req.headers["Content-Length"])
         target = gobject.gettempdir(url.split("/")[-1])
         with open(target, "wb") as ff:
+            asize = format_bytes(size)
             for _ in req.iter_content(chunk_size=1024 * 32):
                 ff.write(_)
                 file_size += len(_)
                 prg = int(10000 * file_size / size)
                 prg100 = prg / 100
-                sz = int(1000 * (int(size / 1024) / 1024)) / 1000
                 self.progresssetval.emit(
-                    _TR("总大小_{} MB _进度_{:0.2f}%").format(sz, prg100),
+                    _TR("总大小_{} _进度_{:0.2f}%").format(asize, prg100),
                     prg,
                 )
         self.progresssetval.emit(_TR("正在解压"), 10000)
@@ -233,6 +233,7 @@ class OcrLineBoundingBox(Structure):
         ("y4", c_float),
     ]
 
+
 #   if ( (unsigned int)(a2[1] - 50) > 0x26DE || (unsigned int)(a2[2] - 50) > 0x26DE )
 #     return 3i64;
 class OCR(baseocr):
@@ -268,6 +269,12 @@ class OCR(baseocr):
         self.mem = windows.MapViewOfFile(self.mappedFile2)
 
     def ocr(self, qimage: QImage):
+        try:
+            return self.ocr_(qimage)
+        except:
+            raise Exception(_TR("无法加载，可能是系统缺少必要的运行库"))
+
+    def ocr_(self, qimage: QImage):
         if qimage.format() != QImage.Format.Format_RGBA8888:
             qimage = qimage.convertToFormat(QImage.Format.Format_RGBA8888)
         with self.lock:
@@ -286,7 +293,7 @@ class OCR(baseocr):
                 return
             boxs = []
             texts = []
-            for i in range(cnt):
+            for _ in range(cnt):
                 size = c_int.from_buffer_copy(windows.ReadFile(self.hPipe, 4)).value
                 if not size:
                     continue

@@ -86,7 +86,9 @@ namespace
 		WORD hookversion[4];
 		DWORD bytesRead;
 		ReadFile(hookPipe, hookversion, sizeof(hookversion), &bytesRead, nullptr);
-		if (memcmp(hookversion, LUNA_VERSION, sizeof(hookversion)) != 0)
+		GUID get_guid;
+		ReadFile(hookPipe, &get_guid, sizeof(get_guid), &bytesRead, nullptr);
+		if (!IsEqualGUID(get_guid, compatible_sig))
 			Host::InfoOutput(HOSTINFO::EmuWarning, TR[UNMATCHABLEVERSION]);
 	}
 	void __handlepipethread(DWORD processId, HANDLE hookPipe, HANDLE hostPipe, HANDLE pipeAvailableEvent)
@@ -366,8 +368,8 @@ namespace Host
 			auto name = HOOK_SEARCH_SHARED_MEM + std::to_wstring(GetCurrentProcessId()) + std::to_wstring(idx++);
 			auto handle = CreateFileMappingW(INVALID_HANDLE_VALUE, &allAccess, PAGE_EXECUTE_READWRITE, 0, size + 2, (name).c_str());
 			auto ptr = MapViewOfFile(handle, FILE_MAP_ALL_ACCESS | FILE_MAP_EXECUTE, 0, 0, size + 2);
-			wcscpy((LPWSTR)ptr, addresses);
-			wcscpy(sp.sharememname, name.c_str());
+			memcpy(ptr, addresses, size + 2);
+			wcscpy_s(sp.sharememname, ARRAYSIZE(sp.sharememname), name.c_str());
 			sp.sharememsize = size + 2;
 		}
 		prs.at(processId).Send(FindHookCmd(sp));
@@ -405,7 +407,7 @@ namespace Host
 		{
 			switch (type)
 			{
-			case HOSTINFO::Notification:
+			case HOSTINFO::EmuConnected:
 				return;
 			case HOSTINFO::EmuWarning:
 				text = FormatString(L"[%s]", TR[T_WARNING]) + text;
@@ -413,6 +415,7 @@ namespace Host
 			case HOSTINFO::EmuGameName:
 				text = L"[Game] " + text;
 				break;
+			default:;
 			}
 			OnHostInfo(HOSTINFO::Console, std::move(text));
 		}

@@ -225,9 +225,6 @@ def fenciqisettings(self):
         ),
     )
     l1.addWidget(_3())
-    b = MySwitch(isplaceholder=True)
-    b.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-    l1.addWidget(b)
     l1.addStretch(1)
     btn = LPushButton("资源下载")
     btn.setCheckable(True)
@@ -364,7 +361,7 @@ def setTabcishu_l(self):
                             tips="注音颜色",
                         ),
                         "",
-                        "字体缩放",
+                        "字体相对大小",
                         D_getspinbox(
                             0.1,
                             1,

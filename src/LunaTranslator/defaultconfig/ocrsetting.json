@@ -4,7 +4,8 @@
             "thread": 4,
             "gpu": false,
             "luid": 0,
-            "accfirst": true
+            "accfirst": true,
+            "device_type": "CPU"
         }
     },
     "youdaodictocr": {
@@ -29,12 +30,24 @@
         "argstype": {
             "API Key": {
                 "refcombo": "接口",
-                "refcombo_i_r": 5,
+                "refcombo_i": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ],
                 "type": "textlist"
             },
             "Secret Key": {
                 "refcombo": "接口",
-                "refcombo_i_r": 5,
+                "refcombo_i": [
+                    0,
+                    1,
+                    2,
+                    3,
+                    4
+                ],
                 "type": "textlist"
             },
             "app_key": {

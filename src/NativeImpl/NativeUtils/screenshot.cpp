@@ -33,7 +33,7 @@ namespace
     }
 }
 extern HWND globalmessagehwnd;
-std::optional<SimpleBMP> parseBMP(std::optional<SimpleBMP> &bmp, bool needcheck = false)
+std::optional<SimpleBMP> parseBMP(std::optional<SimpleBMP> &&bmp, bool needcheck = false)
 {
     if (!bmp)
         return {};
@@ -85,8 +85,15 @@ DECLARE_API void GdiGrabWindow(HWND hwnd, void (*cb)(byte *, size_t))
     if (bf)
         cb(bf.value().data.get(), bf.value().size);
 }
-DECLARE_API bool GdiCropImage(HWND hwnd, RECT rect, void (*cb)(byte *, size_t))
+DECLARE_API bool GdiCropImage(HWND hwnd, int x1, int y1, int x2, int y2, void (*cb)(byte *, size_t))
 {
+    if (x1 == x2 || y1 == y2)
+        return false;
+    RECT rect;
+    rect.left = x1;
+    rect.top = y1;
+    rect.right = x2;
+    rect.bottom = y2;
     for (int i = 0; i < 2; i++)
     {
         switch (i)
@@ -95,6 +102,8 @@ DECLARE_API bool GdiCropImage(HWND hwnd, RECT rect, void (*cb)(byte *, size_t))
         {
             if (!hwnd)
                 continue;
+            if (IsIconic(hwnd))
+                return false;
             RECT r;
             if (!GetWindowRect(hwnd, &r))
                 continue;
@@ -154,8 +163,14 @@ namespace
     callback_t callback;
 }
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
+static std::atomic<bool> onlyonewindow = false;
 DECLARE_API void CreateSelectRangeWindow(HWND parent, float _ocrselectalpha, int _range_r, int _range_g, int _range_b, float _ocrrangewidth, callback_t _callback)
 {
+    {
+        bool _ = false;
+        if (!onlyonewindow.compare_exchange_strong(_, true))
+            return;
+    }
     /*
     QApplication.setHighDpiScaleFactorRoundingPolicy(
             Qt.HighDpiScaleFactorRoundingPolicy.PassThrough
@@ -222,6 +237,7 @@ DECLARE_API void CreateSelectRangeWindow(HWND parent, float _ocrselectalpha, int
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
+    onlyonewindow = false;
 }
 
 static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam)
@@ -326,7 +342,7 @@ static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
                 DestroyWindow(hwnd);
                 return 0;
             }
-            auto &&bmp = CreateBMP(g_hScreenBitmap, false).value_or({});
+            auto &&bmp = CreateBMP(g_hScreenBitmap, false).value_or(SimpleBMP{});
             RECT rect;
             GetWindowRect(hwnd, &rect);
             ReleaseCapture();

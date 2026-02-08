@@ -2,7 +2,7 @@ from qtsymbols import *
 import os, functools, uuid
 from traceback import print_exc
 import qtawesome
-from gui.dynalang import LAction
+from gui.dynalang import LAction, LMenu
 from gui.gamemanager.v3 import dialog_savedgame_v3
 from gui.gamemanager.legacy import dialog_savedgame_legacy
 from gui.gamemanager.setting import dialog_setting_game, userlabelset
@@ -35,7 +35,6 @@ from gui.gamemanager.common import (
     tagitem,
     startgamecheck,
     loadvisinternal,
-    getalistname,
     opendirforgameuid,
     CreateShortcutForUid,
     calculatetagidx,
@@ -227,51 +226,59 @@ class IMGWidget(QLabel):
             max_r = float(self.width()) / self.height()
             if r < max_r:
                 new_w = self.width()
-                new_h = int(new_w / r)
+                new_h = new_w / r
             else:
                 new_h = self.height()
-                new_w = int(new_h * r)
-            return QSize(new_w, new_h)
+                new_w = new_h * r
+            return QSizeF(new_w, new_h)
         elif globalconfig["imagewrapmode"] == 1:
             h, w = size.height(), size.width()
             r = float(w) / h
             max_r = float(self.width()) / self.height()
             if r > max_r:
                 new_w = self.width()
-                new_h = int(new_w / r)
+                new_h = new_w / r
             else:
                 new_h = self.height()
-                new_w = int(new_h * r)
-            return QSize(new_w, new_h)
+                new_w = new_h * r
+            return QSizeF(new_w, new_h)
         elif globalconfig["imagewrapmode"] == 2:
-            return self.size()
+            return QSizeF(self.size())
         elif globalconfig["imagewrapmode"] == 3:
-            return size
+            return QSizeF(size)
 
     def setimg(self, pixmap: QPixmap):
         if pixmap.isNull():
             return
         if not (self.height() and self.width()):
             return
-        if self.__last == (self.size(), globalconfig["imagewrapmode"]):
+        radius = globalconfig["dialog_savegame_layout"]["radius2"]
+        if self.__last == (radius, self.size(), globalconfig["imagewrapmode"]):
             return
-        self.__last = (self.size(), globalconfig["imagewrapmode"])
+        self.__last = (radius, self.size(), globalconfig["imagewrapmode"])
         rate = self.devicePixelRatioF()
         newpixmap = QPixmap(self.size() * rate)
         newpixmap.setDevicePixelRatio(rate)
         newpixmap.fill(Qt.GlobalColor.transparent)
         painter = QPainter(newpixmap)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.drawPixmap(self.getrect(pixmap.size()), pixmap)
+        painter.setRenderHints(
+            QPainter.RenderHint.Antialiasing | QPainter.RenderHint.SmoothPixmapTransform
+        )
+        rectf = self.getrect(pixmap.size())
+
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), radius, radius)
+        painter.setClipPath(path)
+
+        painter.drawPixmap(rectf, pixmap, QRectF(pixmap.rect()))
         painter.end()
         self.setPixmap(newpixmap)
 
     def getrect(self, size):
         size = self.adaptsize(size)
-        rect = QRect()
-        rect.setX(int((self.width() - size.width()) / 2))
-        rect.setY(int((self.height() - size.height()) / 2))
+        rect = QRectF()
+        rect.setX((self.width() - size.width()) / 2)
+        rect.setY((self.height() - size.height()) / 2)
         rect.setSize(size)
         return rect
 
@@ -498,7 +505,6 @@ class dialog_savedgame_new(QWidget):
         startgame = LAction("开始游戏", menu)
         delgame = LAction("删除游戏", menu)
         opendir = LAction("打开目录", menu)
-        addtolist = LAction("添加到列表", menu)
         createlnk = LAction("创建快捷方式", menu)
         gamesetting = LAction("游戏设置", menu)
         addgame = LAction("添加游戏", menu)
@@ -516,7 +522,14 @@ class dialog_savedgame_new(QWidget):
             menu.addAction(gamesetting)
             menu.addAction(delgame)
             menu.addSeparator()
-            menu.addAction(addtolist)
+            __vis, __uid = loadvisinternal(True, self.reftagid)
+            if __uid:
+                addtolist = LMenu("添加到列表", menu)
+                menu.addMenu(addtolist)
+                for _ in range(len(__vis)):
+                    a = QAction(__vis[_], addtolist)
+                    a.setData(__uid[_])
+                    addtolist.addAction(a)
         else:
             if self.reftagid:
                 menu.addAction(editname)
@@ -532,8 +545,6 @@ class dialog_savedgame_new(QWidget):
             startgamecheck(self, getreflist(self.reftagid), self.currentfocusuid)
         elif action == gamesetting:
             self.showsettingdialog()
-        elif action == addtolist:
-            self.addtolist()
         elif action == createlnk:
             CreateShortcutForUid(self.currentfocusuid)
         elif action == delgame:
@@ -559,7 +570,9 @@ class dialog_savedgame_new(QWidget):
                         "opened": True,
                     }
                     savegametaged.insert(i, tag)
+                    globalconfig["currvislistuid"] = tag["uid"]
                     self.loadcombo(False)
+                    self.refresh_curr()
                 elif action == editname:
 
                     savegametaged[i]["title"] = title
@@ -584,10 +597,18 @@ class dialog_savedgame_new(QWidget):
                 i = calculatetagidx(self.reftagid)
                 savegametaged.pop(i)
                 self.loadcombo(False)
-                self.reftagid = self.vislistcombo.getIndexData(
-                    self.vislistcombo.currentIndex()
-                )
-                self.reflist = getreflist(self.reftagid)
+                self.refresh_curr()
+
+        elif action:  # addtolist
+            __uid = action.data()
+            if __uid:
+                self.addtolistcallback(__uid, self.currentfocusuid)
+
+    def refresh_curr(self):
+
+        self.reftagid = self.vislistcombo.getIndexData(self.vislistcombo.currentIndex())
+        self.reflist = getreflist(self.reftagid)
+        self.tagschanged(self.currtags)
 
     def directshow(self):
         self.flow.directshow()
@@ -644,15 +665,20 @@ class dialog_savedgame_new(QWidget):
             _style += "font-size:{}pt;".format(_f.pointSize())
             _style += 'font-family:"{}";'.format(_f.family())
         style = "#{}{{ {} }}".format(key, _style)
-
-        style += "#savegame_existsTrue{{background-color:{};}}".format(
-            globalconfig["dialog_savegame_layout"]["backcolor2"]
+        dialog_savegame_layout = globalconfig["dialog_savegame_layout"]
+        style += (
+            "#savegame_existsTrue{{background-color:{};border-radius: {}px;}}".format(
+                dialog_savegame_layout["backcolor2"], dialog_savegame_layout["radius"]
+            )
         )
-        style += "#savegame_existsFalse{{background-color:{};}}".format(
-            globalconfig["dialog_savegame_layout"]["onfilenoexistscolor2"]
+        style += (
+            "#savegame_existsFalse{{background-color:{};border-radius: {}px;}}".format(
+                dialog_savegame_layout["onfilenoexistscolor2"],
+                dialog_savegame_layout["radius"],
+            )
         )
-        style += "#savegame_onselectcolor1{{background-color: {};}}".format(
-            globalconfig["dialog_savegame_layout"]["onselectcolor2"]
+        style += "#savegame_onselectcolor1{{background-color: {};border-radius: {}px;}}".format(
+            dialog_savegame_layout["onselectcolor2"], dialog_savegame_layout["radius"]
         )
         self.setStyleSheet(style)
 
@@ -746,14 +772,6 @@ class dialog_savedgame_new(QWidget):
         except:
             pass
         return False
-
-    def addtolist(self):
-        getalistname(
-            self,
-            lambda x: self.addtolistcallback(x, self.currentfocusuid),
-            True,
-            self.reftagid,
-        )
 
     def addtolistcallback(self, uid, gameuid):
         if gameuid not in getreflist(uid):

@@ -1,5 +1,5 @@
-﻿#include <dbghelp.h>
-#include <uiautomation.h>
+﻿#include <uiautomation.h>
+#include "filemapping.hpp"
 #include "osversion.hpp"
 #ifndef WINXP
 #include <shellscalingapi.h>
@@ -303,44 +303,70 @@ DECLARE_API void OpenFileEx(LPCWSTR file)
         ShellExecuteW(NULL, L"open", file, NULL, NULL, SW_SHOWNORMAL);
     }
 }
-__declspec(dllexport) std::optional<WORD> MyGetBinaryType(LPCWSTR file)
-{
-    CHandle hFile{CreateFileW(file, GENERIC_READ, FILE_SHARE_READ, 0,
-                              OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, 0)};
-    if (!hFile)
-        return {};
-    CHandle hMap{CreateFileMappingW(
-        hFile,
-        NULL,          // security attrs
-        PAGE_READONLY, // protection flags
-        0,             // max size - high DWORD
-        0,             // max size - low DWORD
-        NULL)};        // mapping name - not used
-    if (!hMap)
-        return {};
 
-    // next, map the file to our address space
-    void *mapAddr = MapViewOfFileEx(
-        hMap,          // mapping object
-        FILE_MAP_READ, // desired access
-        0,             // loc to map - hi DWORD
-        0,             // loc to map - lo DWORD
-        0,             // #bytes to map - 0=all
-        NULL);         // suggested map addr
-    if (!mapAddr)
+std::optional<WORD> MyGetBinaryType(LPCWSTR file)
+{
+    FileMapping fm(file);
+    if (!fm.mapAddr)
         return {};
-    auto peHdr = ImageNtHeader(mapAddr);
-    auto type = peHdr->FileHeader.Machine;
-    UnmapViewOfFile(mapAddr);
-    return type;
+    PIMAGE_NT_HEADERS peHdr = GetImageNtHeader(fm.mapAddr);
+    if (!peHdr)
+        return {};
+    return peHdr->FileHeader.Machine;
+}
+
+#ifndef IMAGE_FILE_MACHINE_ARM64
+#define IMAGE_FILE_MACHINE_ARM64 0xAA64 // ARM64 Little-Endian
+#endif
+
+SHAREFUNCTION std::optional<std::wstring> SearchDllPath(const std::wstring &dll)
+{
+    auto len = SearchPathW(NULL, dll.c_str(), NULL, 0, NULL, NULL);
+    if (!len)
+        return {};
+    std::wstring buff;
+    buff.resize(len);
+    len = SearchPathW(NULL, dll.c_str(), NULL, len, buff.data(), NULL);
+    if (!len)
+        return {};
+    auto type = MyGetBinaryType(buff.c_str());
+    if (!type)
+        return {};
+    if constexpr (sizeof(size_t) == 8)
+        if (type.value() == IMAGE_FILE_MACHINE_ARM64)
+            return {};
+    return buff;
+}
+
+DECLARE_API void SearchDllPath(LPCWSTR file, void (*cb)(LPCWSTR))
+{
+    if (auto _ = SearchDllPath(file))
+    {
+        cb(_.value().c_str());
+    }
 }
 
 DECLARE_API bool IsDLLBit64(LPCWSTR file)
 {
+    if (!file)
+        return false;
     auto type = MyGetBinaryType(file);
     if (!type)
         return false;
     return type.value() == IMAGE_FILE_MACHINE_AMD64;
+}
+
+DECLARE_API bool IsDLLBitSameAsMe(LPCWSTR file)
+{
+    if (!file)
+        return false;
+    auto type = MyGetBinaryType(file);
+    if (!type)
+        return false;
+    if constexpr (sizeof(size_t) == 8)
+        return type.value() == IMAGE_FILE_MACHINE_AMD64;
+    else
+        return type.value() == IMAGE_FILE_MACHINE_I386;
 }
 
 typedef struct

@@ -11,9 +11,14 @@ option(WIN10ABOVE "WIN10ABOVE" OFF)
 if(WIN10ABOVE)
     # https://github.com/microsoft/onnxruntime/issues/15255
     # DML和ort的版本必须对应，因此必须附带而非加载系统的，否则无法使用gpu
-    set(ort_version 1.22.1) 
+    
+    if(${CMAKE_SIZEOF_VOID_P} EQUAL 8)
+        set(ort_version 1.23.0) 
+    else()
+        set(ort_version 1.22.0) #之后不再有32位release
+    endif()
     FetchContent_Declare(onnxruntime 
-        URL https://github.com/microsoft/onnxruntime/releases/download/v${ort_version}/Microsoft.ML.OnnxRuntime.DirectML.${ort_version}.nupkg
+        URL https://www.nuget.org/api/v2/package/Microsoft.ML.OnnxRuntime.DirectML/${ort_version}
         DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     FetchContent_MakeAvailable(onnxruntime)
@@ -41,6 +46,13 @@ if(WIN10ABOVE)
     FetchContent_MakeAvailable(directml)
     set(directml_DLL ${directml_SOURCE_DIR}/bin/${platform}-win/DirectML.dll)
     message(${directml_DLL})
+        
+    add_custom_target(copy_directml_dll
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            ${directml_DLL}
+            ${CMAKE_FINAL_OUTPUT_DIRECTORY}/DirectML.dll
+    )
+    add_dependencies(onnxruntime copy_directml_dll)
 else()
     set(ort_version 1.10.0)
 
@@ -54,4 +66,14 @@ else()
     target_link_libraries(onnxruntime INTERFACE ${onnxruntime_SOURCE_DIR}/lib/onnxruntime.lib)
     set(onnxruntime_DLL ${onnxruntime_SOURCE_DIR}/lib/onnxruntime.dll)
     message(${onnxruntime_DLL})
+    
 endif()
+
+add_custom_target(copy_onnxruntime_dll
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+        ${onnxruntime_DLL}
+        ${CMAKE_FINAL_OUTPUT_DIRECTORY}/onnxruntime.dll
+)
+add_dependencies(onnxruntime copy_onnxruntime_dll)
+
+target_link_options(onnxruntime INTERFACE "/DELAYLOAD:onnxruntime.dll")

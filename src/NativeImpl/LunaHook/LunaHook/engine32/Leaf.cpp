@@ -381,7 +381,7 @@ static void SpecialHookLeaf(hook_context *context, HookParam *hp, TextBuffer *bu
 // Remove both \n and \k
 static void LeafFilter(TextBuffer *buffer, HookParam *)
 {
-  LPSTR text = (LPSTR)buffer->buff;
+  LPSTR text = (LPSTR)buffer->data;
   if (::memchr(text, '\\', buffer->size))
   {
     StringFilter(buffer, TEXTANDLEN("\\n"));
@@ -396,7 +396,7 @@ namespace
     save = re::sub(save, "<R(.+?)\\|.+>", "$1");
     buffer->from(save);
   }
-  void hook2a(hook_context *s, TextBuffer buffer)
+  void hook2a(hook_context *s, TextBuffer buffer, HookParam *)
   {
     s->ecx = (DWORD)allocateString(buffer.viewA());
   }
@@ -437,7 +437,6 @@ bool InsertLeafHook()
   hp.type = USING_STRING | USING_SPLIT; // use top of the stack as split
   hp.text_fun = SpecialHookLeaf;
   hp.filter_fun = LeafFilter; // remove two characters
-  ConsoleOutput("INSERT Leaf");
   auto succ = NewHook(hp, "Leaf");
 
   // ConsoleOutput("Leaf: disable GDI hooks");
@@ -494,7 +493,7 @@ bool activehook()
 }
 void AquaplusFilter(TextBuffer *buffer, HookParam *)
 {
-  auto text = reinterpret_cast<LPSTR>(buffer->buff);
+  auto text = reinterpret_cast<LPSTR>(buffer->data);
 
   CharReplacer(buffer, '^', '\"');
   StringCharReplacer(buffer, TEXTANDLEN("\\n"), ' ');
@@ -744,7 +743,7 @@ namespace
   bool wa2special()
   {
     BYTE sig[] = {
-        0x6A, 0x01, 0x6A, 0x28, 0x6A, 0x20, 0x6A, 0x0E, 0x6A, 0x00, 0x6A, 0x0F, 0x6A, 0x28, 0x6A, 0x1C,
+        0x6A, 0x01, 0x6A, 0x28, 0x6A, 0x20, 0x6A, 0x0E, 0x6A, 0x00, 0x6A, 0x0F, 0x6A, 0x28, 0x6A, 0x1C
         // .text:0040DE70                 push    1
         // .text:0040DE72                 push    28h ; '('
         // .text:0040DE74                 push    20h ; ' '
@@ -862,7 +861,8 @@ namespace
   {
     static bool iskizuato = wcscmp(processName_lower, L"kizuato.exe") == 0;
     static bool issizuku = wcscmp(processName_lower, L"sizuku.exe") == 0;
-    if (!issizuku && !iskizuato)
+    static bool isthfont = wcscmp(processName_lower, L"lvns3.exe") == 0;
+    if (!issizuku && !iskizuato && !isthfont)
       return false;
     if (0)
     {
@@ -890,7 +890,40 @@ namespace
         0xa3, XX4,
         0x8d, 0x90, 0x00, 0x04, 0x00, 0x00,
         0x0f, 0xbf, 0xc7};
+    BYTE sig2[] = {
+        0xe8, XX4,
+        0x83, 0xc4, 0x04,
+        0xa3, 0xf0, 0xba, 0x41, 0x00,
+        0x0f, 0xbf, 0xce,
+        0xc1, 0xe1, 0x03,
+        0x83, 0xc0, 0x28,
+        0x0f, 0xbf, 0x75, 0x0c,
+        0x8d, 0x14, 0xc9,
+        0xa3, XX4,
+        0x05, 0x00, 0x04, 0x00, 0x00,
+        0x01, 0x55, 0xf4,
+        0x33, 0xd2};
+    BYTE sig3[] = {
+        0xe8, XX4,
+        0x83, 0xc4, 0x04,
+        0xa3, XX, XX, XX, 0x00,
+        0x0f, 0xbf, 0xcb,
+        0xc1, 0xe1, 0x03,
+        0x83, 0xc0, 0x28,
+        0x0f, 0xbf, 0xde,
+        0x8d, 0x14, 0xc9,
+        0xa3, XX4,
+        0x05, 0x00, 0x04, 0x00, 0x00,
+        0x01, 0x55, 0xfc,
+        0x0f, 0xbf, 0xcf,
+        0xa3, XX4,
+        0x89, 0x5d, 0xf4,
+        0x33, 0xd2};
     auto addr = MemDbg::findBytes(sig, sizeof(sig), processStartAddress, processStopAddress);
+    if (!addr)
+      addr = MemDbg::findBytes(sig2, sizeof(sig2), processStartAddress, processStopAddress);
+    if (!addr)
+      addr = MemDbg::findBytes(sig3, sizeof(sig3), processStartAddress, processStopAddress);
     if (!addr)
       return false;
     addr = findfuncstart(addr, 0x100, true);
@@ -902,10 +935,10 @@ namespace
     hp.text_fun = [](hook_context *context, HookParam *hp, TextBuffer *buffer, uintptr_t *split)
     {
       WORD ch = context->stack[3];
-      static auto charset = StringToWideString(LoadResData(iskizuato ? L"kizfont" : L"sizfont", L"CHARSET"));
+      static auto charset = StringToWideString(LoadResData(iskizuato ? L"kizfont" : (issizuku ? L"sizfont" : L"thfont"), L"CHARSET"));
       buffer->from_t(charset[ch]);
     };
-    return NewHook(hp, iskizuato ? "kizuato" : "sizuku");
+    return NewHook(hp, iskizuato ? "kizuato" : (issizuku ? "sizuku" : "toheart"));
   }
 }
 bool Leaf::attach_function()

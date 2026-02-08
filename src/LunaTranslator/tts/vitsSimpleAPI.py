@@ -1,4 +1,4 @@
-from myutils.utils import urlpathjoin
+from myutils.config import urlpathjoin
 from tts.basettsclass import TTSbase, SpeechParam
 import functools
 from gui.customparams import customparams, getcustombodyheaders
@@ -36,7 +36,7 @@ class TTS(TTSbase):
         else:
             length = 1 - param.speed / 5
         model, idx, _ = voice
-        query = dict(text=content, id=idx, length=length)
+        query = dict(text=content, id=idx, length=length, streaming=True)
         extrabody, extraheader = getcustombodyheaders(self.config.get("customparams"), **locals())
         headers = {"ngrok-skip-browser-warning": "true"}
         headers.update(extraheader)
@@ -45,6 +45,7 @@ class TTS(TTSbase):
             urlpathjoin(self.config["URL"], "voice/" + model.lower()),
             params=query,
             headers=headers,
+            stream=True,
         )
 
         return response

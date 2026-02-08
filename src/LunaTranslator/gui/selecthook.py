@@ -3,8 +3,14 @@ import functools, binascii
 from collections import OrderedDict
 from traceback import print_exc
 import qtawesome, NativeUtils, gobject, os
-from myutils.config import savehook_new_data, globalconfig, _TR, static_data
-from myutils.utils import get_time_stamp, dynamiclink, is_ascii_control
+from myutils.config import (
+    savehook_new_data,
+    globalconfig,
+    _TR,
+    static_data,
+    dynamiclink,
+)
+from myutils.utils import get_time_stamp, is_ascii_control
 from gui.gamemanager.dialog import dialog_setting_game
 from textio.textsource.texthook import texthook
 from gui.usefulwidget import (
@@ -16,9 +22,9 @@ from gui.usefulwidget import (
     getsimplepatheditor,
     FocusSpin,
     FocusCombo,
-    RichMessageBox,
     TableViewW,
 )
+from gui.RichMessageBox import RichMessageBox
 from gui.dynalang import (
     LFormLayout,
     LRadioButton,
@@ -36,7 +42,7 @@ class HOSTINFO:
     Console = 0
     EmuWarning = 1
     EmuGameName = 2
-    Notification = 3
+    EmuConnected = 3
 
 
 def getformlayoutw(w=None, cls=LFormLayout, hide=False):
@@ -225,10 +231,7 @@ class searchhookparam(LDialog):
         return super().showEvent(a0)
 
     def __init__(self, parent) -> None:
-        super().__init__(
-            parent,
-            Qt.WindowType.WindowCloseButtonHint | Qt.WindowType.WindowStaysOnTopHint,
-        )
+        super().__init__(parent, Qt.WindowType.WindowCloseButtonHint)
         self.setWindowTitle("搜索设置")
         mainlayout = QVBoxLayout(self)
         checks = QButtonGroup_switch_widegt(self)
@@ -441,7 +444,6 @@ class hookselect(closeashidewindow):
 
     def __init__(self, parent):
         super(hookselect, self).__init__(parent, globalconfig["selecthookgeo"])
-        self.setWindowFlags(Qt.WindowType.WindowStaysOnTopHint | self.windowFlags())
         self.setupUi()
         self.hidesearchhookbuttons()
         self.is_focus_normal = True
@@ -520,6 +522,8 @@ class hookselect(closeashidewindow):
         self.currentheader = ["显示", "HOOK", "文本"]
         self.saveifembedable = {}
         self.embedablenum = 0
+        self.embedselectall = {}
+        self.hookselectall = {}
 
     def addnewhook(self, key, select, isembedable):
         hc, hn, tp = key
@@ -539,6 +543,8 @@ class hookselect(closeashidewindow):
         selectbutton = getsimpleswitch(
             {1: select}, 1, callback=functools.partial(self.accept, key)
         )
+        if self.hookselectall.get(hc, False):
+            selectbutton.click()
         rown = 0 if isembedable else self.ttCombomodelmodel.rowCount()
 
         items = [
@@ -561,6 +567,9 @@ class hookselect(closeashidewindow):
                 self.ttCombomodelmodel.index(rown, 1),
                 checkbtn,
             )
+            if self.embedselectall.get(hc, False):
+                checkbtn.click()
+
         if select and self.tttable.currentIndex() == -1:
             self.tttable.setCurrentIndex(rown)
 
@@ -722,9 +731,41 @@ class hookselect(closeashidewindow):
         self.tabwidget.addTab(self.sysOutput, ("日志"))
         self.tabwidget.setCurrentIndex(1)
 
-    def showmenu(self, p: QPoint):
+    def parse_hook_menu(self, index: QModelIndex):
+        _ = self.querykeyofrow(index)
+        if not _:
+            return
+        mp = (self.embedselectall, self.hookselectall)[index.column() == 0]
+        hc, hn, tp = _
+        menu = QMenu(self.tttable)
+        selectall = LAction("选取同名全部", menu)
+        selectall.setCheckable(True)
+        selectall.setChecked(mp.get(hc, False))
+        menu.addAction(selectall)
+        action = menu.exec(self.tttable.cursor().pos())
+        if action == selectall:
+            mp[hc] = selectall.isChecked()
+            if not mp[hc]:
+                return
+            for _ in range(self.tttable.model().rowCount()):
+                w: MySwitch = self.tttable.indexWidgetX(_, index.column())
+                if not w:
+                    continue
+                _ = self.querykeyofrow(_)
+                if not _:
+                    continue
+                hc, hn, tp = _
+                if not mp.get(hc, False):
+                    continue
+                w.click()
+
+    def showmenu(self, _):
         index = self.tttable.currentIndex()
         if not index.isValid():
+            return
+        elif (self.embedablenum and index.column() == 1) or (index.column() == 0):
+            return self.parse_hook_menu(index)
+        elif self.tttable.indexWidget(index):
             return
         menu = QMenu(self.tttable)
         remove = LAction("移除", menu)
@@ -962,8 +1003,14 @@ class hookselect(closeashidewindow):
             )
         elif info == HOSTINFO.EmuGameName:
             gobject.base.displayinfomessage(sentence, "<msg_info_refresh>")
-        elif info == HOSTINFO.Notification:
-            gobject.base.displayinfomessage(sentence, "<msg_info_refresh>")
+        elif info == HOSTINFO.EmuConnected:
+            gobject.base.translation_ui.showMarkDownSig.emit(
+                "{}\n[{}]({})".format(
+                    sentence,
+                    _TR("模拟器游戏支持表"),
+                    dynamiclink("emugames.html", docs=True),
+                )
+            )
 
     def getnewsentence(self, sentence):
         self.textbrowappendandmovetoend(self.textOutput, sentence)

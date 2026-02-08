@@ -135,9 +135,10 @@ class APItts(HTTPHandler):
         sema.wait()
         if ret[0].error:
             return {"error": ret[0].error}
-        return ResponseWithHeader(
-            data=ret[0].data, headers={"content-type": ret[0].mime}
-        )
+        h = {"content-type": ret[0].mime}
+        if len(ret[0]):
+            h["content-length"] = len(ret[0])
+        return ResponseWithHeader(data=ret[0].data, headers=h)
 
     def callbacktts(self, sema: threading.Event, ret: list, result: TTSResult):
         ret.append(result)
@@ -315,6 +316,14 @@ class BasePage(HTTPHandler):
         return FileResponse(r"LunaTranslator\htmlcode\service\basepage.html")
 
 
+class TextInput(HTTPHandler):
+    path = "/api/textinput"
+
+    def parse(self, _: RequestInfo):
+        text = _.query.get("text")
+        gobject.base.textgetmethod(text, is_auto_run=False)
+
+
 def registerall(service: TCPService):
     service.register(APISearchWord)
     service.register(APImecab)
@@ -334,3 +343,4 @@ def registerall(service: TCPService):
     service.register(internalservicetranshistws)
     service.register(TextOutputOrigin)
     service.register(TextOutputTrans)
+    service.register(TextInput)

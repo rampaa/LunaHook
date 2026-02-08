@@ -1,5 +1,11 @@
 {
+    "llama.cpp": {},
     "screenshot_savepath": "",
+    "screenshot_method": {
+        "gdi": true,
+        "winrt": true,
+        "magpie": true
+    },
     "history": {
         "autosave": false,
         "showorigin": true,
@@ -30,6 +36,9 @@
     "useextrahtml": false,
     "ocrselectalpha": 0.3,
     "foldstatus": {
+        "ocr": {
+            "other": false
+        },
         "others": {
             "fts": true,
             "netservice": true,
@@ -285,7 +294,9 @@
         "changecharset_charset": 2,
         "limittextlength_use": false,
         "limittextlength_length": 40,
-        "clearText": false
+        "clearText": false,
+        "changefontsize": 1.0,
+        "changefontsize_use": false
     },
     "requestinterval": 0,
     "keepontop": true,
@@ -293,6 +304,12 @@
     "buttonsize2": 18,
     "language_setted_2.4.5": false,
     "postprocess_rank": [],
+    "text_area_background": false,
+    "text_area_background_alpha": 50,
+    "text_area_background_color": "#ff0000",
+    "text_area_background_r": 5,
+    "text_area_background_w": 5,
+    "text_area_background_h": 5,
     "fix_translate_rank": false,
     "fix_translate_rank_rank": [],
     "cishuvisrank": [],
@@ -420,13 +437,14 @@
     "rawtextcolor": "#000000",
     "backcolor": "#ffaaff",
     "transparent": 10,
-    "transparent_EX": false,
+    "transparent_EX": true,
     "backcolor_tool": "#ffaaff",
     "transparent_tool": 50,
     "isshowhira": true,
+    "hidetools": false,
     "locktools": true,
     "locktoolsEx": false,
-    "showfanyisource": true,
+    "showfanyisource": false,
     "showfanyi": true,
     "autoread": false,
     "ttsnointerrupt": false,
@@ -451,7 +469,8 @@
         "addsuccautocloseEx": false,
         "boldword": false,
         "tags": [],
-        "allowDuplicate": true
+        "allowDuplicate": true,
+        "autorecord": false
     },
     "imageformat2": "webp",
     "mp3kbps": 64,
@@ -479,6 +498,8 @@
         "itemh": 190,
         "margin": 6,
         "margin2": 6,
+        "radius": 10,
+        "radius2": 10,
         "textH": 0,
         "backcolor2": "#40ffffff",
         "onselectcolor2": "#40007fff",
@@ -580,8 +601,8 @@
                 "align": 2
             },
             "backtransbutton": {
-                "use": false,
-                "tip": "背景窗口透明",
+                "use": true,
+                "tip": "窗口背景透明",
                 "icon": "fa.lightbulb-o",
                 "align": 2
             },
@@ -731,7 +752,7 @@
             "history": {
                 "use": true,
                 "tip": "显示/隐藏历史文本",
-                "icon": "fa.rotate-left",
+                "icon": "fa.history",
                 "align": 2
             },
             "gamepad_new": {
@@ -854,230 +875,143 @@
     "quick_setting": {
         "use": true,
         "all": {
+            "51": {
+                "name": "窗口背景透明"
+            },
             "36": {
-                "use": false,
-                "name": "读取剪贴板",
-                "keystring": ""
+                "name": "读取剪贴板"
             },
             "_1": {
-                "use": false,
-                "name": "手动执行",
-                "keystring": ""
+                "name": "手动执行"
             },
             "_2": {
-                "use": false,
-                "name": "自动模式",
-                "keystring": ""
+                "name": "自动模式"
             },
             "_3": {
-                "use": false,
-                "name": "打开设置",
-                "keystring": ""
+                "name": "打开设置"
             },
             "_4": {
-                "use": false,
-                "name": "复制到剪贴板",
-                "keystring": ""
+                "name": "复制到剪贴板"
             },
             "_5": {
-                "use": false,
-                "name": "显示/隐藏原文",
-                "keystring": ""
+                "name": "显示/隐藏原文"
             },
             "_51": {
-                "use": false,
-                "name": "显示/隐藏翻译",
-                "keystring": ""
+                "name": "显示/隐藏翻译"
             },
             "_6": {
-                "use": false,
-                "name": "显示/隐藏历史文本",
-                "keystring": ""
+                "name": "显示/隐藏历史文本"
             },
             "_7": {
-                "use": false,
-                "name": "朗读",
-                "keystring": ""
+                "name": "朗读"
             },
             "_7_1": {
-                "use": false,
-                "name": "朗读_中断",
-                "keystring": ""
+                "name": "朗读_中断"
             },
             "_8": {
-                "use": false,
-                "name": "鼠标穿透窗口",
-                "keystring": ""
+                "name": "鼠标穿透窗口"
             },
             "_9": {
-                "use": false,
-                "name": "锁定工具栏",
-                "keystring": ""
+                "name": "锁定工具栏"
             },
             "_10": {
-                "use": false,
-                "name": "游戏管理",
-                "keystring": ""
+                "name": "游戏管理"
             },
             "_11": {
-                "use": false,
-                "name": "选择游戏",
-                "keystring": ""
+                "name": "选择游戏"
             },
             "_12": {
-                "use": false,
-                "name": "选择文本",
-                "keystring": ""
+                "name": "选择文本"
             },
             "_13": {
-                "use": false,
-                "name": "选取OCR范围",
-                "keystring": ""
+                "name": "选取OCR范围"
             },
             "_14": {
-                "use": false,
-                "name": "显示/隐藏范围框",
-                "keystring": ""
+                "name": "显示/隐藏范围框"
             },
             "_14_1": {
-                "use": false,
-                "name": "清除OCR范围",
-                "keystring": ""
+                "name": "清除OCR范围"
             },
             "44": {
-                "use": false,
-                "name": "连点器",
-                "keystring": ""
+                "name": "连点器"
             },
             "45": {
-                "use": false,
-                "name": "重置翻译状态",
-                "keystring": ""
+                "name": "重置翻译状态"
             },
             "46": {
-                "use": false,
-                "name": "多重区域模式_切换到前一个区域",
-                "keystring": ""
+                "name": "多重区域模式_切换到前一个区域"
             },
             "47": {
-                "use": false,
-                "name": "多重区域模式_切换到下一个区域",
-                "keystring": ""
+                "name": "多重区域模式_切换到下一个区域"
             },
             "48": {
-                "use": false,
-                "name": "多重区域模式_切换到鼠标临近区域",
-                "keystring": ""
+                "name": "多重区域模式_切换到鼠标临近区域"
             },
             "49": {
-                "use": false,
-                "name": "多重区域模式_取消区域聚焦",
-                "keystring": ""
+                "name": "多重区域模式_取消区域聚焦"
             },
             "50": {
-                "use": false,
-                "name": "立即保存配置",
-                "keystring": ""
+                "name": "立即保存配置"
             },
             "_15": {
-                "use": false,
-                "name": "绑定窗口_（点击自己取消）",
-                "keystring": ""
+                "name": "绑定窗口_（点击自己取消）"
             },
             "_16": {
-                "use": false,
-                "name": "显示/隐藏翻译窗口",
-                "keystring": ""
+                "name": "显示/隐藏翻译窗口"
             },
             "_17": {
-                "use": false,
-                "name": "退出",
-                "keystring": ""
+                "name": "退出"
             },
             "_21": {
-                "use": false,
-                "name": "窗口截图",
-                "keystring": ""
+                "name": "窗口截图"
             },
             "_22": {
-                "use": false,
-                "name": "游戏静音",
-                "keystring": ""
+                "name": "游戏静音"
             },
             "43": {
-                "use": true,
-                "name": "游戏暂停",
-                "keystring": ""
+                "name": "游戏暂停"
             },
             "41": {
-                "use": false,
-                "name": "Magpie_缩放",
-                "keystring": ""
+                "name": "Magpie_缩放"
             },
             "42": {
-                "use": false,
-                "name": "Magpie_窗口化缩放",
-                "keystring": ""
+                "name": "Magpie_窗口化缩放"
             },
             "_26": {
-                "use": false,
-                "name": "进行一次OCR",
-                "keystring": ""
+                "name": "进行一次OCR"
             },
             "_26_1": {
-                "use": false,
-                "name": "再次进行OCR",
-                "keystring": ""
+                "name": "再次进行OCR"
             },
             "_28": {
-                "use": false,
-                "name": "复制到剪贴板_翻译",
-                "keystring": ""
+                "name": "复制到剪贴板_翻译"
             },
             "37": {
-                "use": false,
-                "name": "取词查词",
-                "keystring": ""
+                "name": "取词查词"
             },
             "40": {
-                "use": false,
-                "name": "取词查词_在新窗口中",
-                "keystring": ""
+                "name": "取词查词_在新窗口中"
             },
             "38": {
-                "use": false,
-                "name": "取词翻译",
-                "keystring": ""
+                "name": "取词翻译"
             },
             "39": {
-                "use": false,
-                "name": "OCR_查词",
-                "keystring": ""
+                "name": "OCR_查词"
             },
             "_29": {
-                "use": false,
-                "name": "Anki_录音",
-                "keystring": ""
+                "name": "Anki_录音"
             },
             "_30": {
-                "use": false,
-                "name": "Anki_录音_例句",
-                "keystring": ""
+                "name": "Anki_录音_例句"
             },
             "_32": {
-                "use": false,
-                "name": "自动朗读",
-                "keystring": ""
+                "name": "自动朗读"
             },
             "_33": {
-                "use": false,
-                "name": "朗读_单词",
-                "keystring": ""
+                "name": "朗读_单词"
             },
             "_35": {
-                "use": false,
-                "name": "Anki_添加",
-                "keystring": ""
+                "name": "Anki_添加"
             }
         }
     },
@@ -1157,6 +1091,30 @@
             "name": "NeoSpeech",
             "type": "offline"
         },
+        "tolk": {
+            "use": false,
+            "name": "Tolk (读屏软件)",
+            "type": "offline",
+            "args": {
+                "trySAPI": true,
+                "preferSAPI": false
+            },
+            "argstype": {
+                "trySAPI": {
+                    "name": "启用SAPI回退",
+                    "type": "switch"
+                },
+                "preferSAPI": {
+                    "name": "优先使用SAPI",
+                    "type": "switch"
+                }
+            },
+            "useEx": "useExfunction"
+        },
+        "selfbuild": {
+            "use": false,
+            "name": "自定义"
+        },
         "voiceroid2": {
             "use": false,
             "name": "VoiceRoid2",
@@ -1193,7 +1151,10 @@
             "name": "GPT-SoVITS",
             "type": "offline",
             "args": {
+                "APITYPE": "gptsovits",
                 "URL": "http://127.0.0.1:9880",
+                "link1": "https://github.com/RVC-Boss/GPT-SoVITS",
+                "link2": "https://github.com/AI-Hobbyist/GPT-SoVITS-Inference",
                 "apiv": "v2",
                 "customparams": [
                     {
@@ -1211,10 +1172,76 @@
                         "value": "",
                         "type": "string"
                     }
-                ]
+                ],
+                "URL2": "http://127.0.0.1:8000",
+                "version": "v4",
+                "customparams2": []
             },
             "argstype": {
+                "link1": {
+                    "type": "link",
+                    "name": "link",
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gptsovits"
+                },
+                "link2": {
+                    "type": "link",
+                    "name": "link",
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gsvi"
+                },
+                "APITYPE": {
+                    "rank": 0,
+                    "type": "combo",
+                    "name": "repo",
+                    "list": [
+                        "RVC-Boss/GPT-SoVITS",
+                        "AI-Hobbyist/GPT-SoVITS-Inference"
+                    ],
+                    "internal": [
+                        "gptsovits",
+                        "gsvi"
+                    ]
+                },
+                "URL2": {
+                    "name": "URL",
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gsvi"
+                },
+                "URL": {
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gptsovits"
+                },
+                "version": {
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gsvi",
+                    "type": "combo",
+                    "name": "Version",
+                    "list": [
+                        "v4",
+                        "v3",
+                        "v2",
+                        "v2Pro",
+                        "v2ProPlus"
+                    ],
+                    "internal": [
+                        "v4",
+                        "v3",
+                        "v2",
+                        "v2Pro",
+                        "v2ProPlus"
+                    ]
+                },
+                "customparams2": {
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gsvi",
+                    "name": "其他参数",
+                    "type": "custom",
+                    "function": "customparams"
+                },
                 "apiv": {
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gptsovits",
                     "type": "combo",
                     "name": "API version",
                     "list": [
@@ -1227,6 +1254,8 @@
                     ]
                 },
                 "customparams": {
+                    "refcombo": "APITYPE",
+                    "refcombo_i": "gptsovits",
                     "name": "其他参数",
                     "type": "custom",
                     "function": "customparams"
@@ -1343,7 +1372,7 @@
                 "top_p_use": true,
                 "frequency_penalty": 0,
                 "frequency_penalty_use": false,
-                "reasoning_effort": "medium",
+                "reasoning_effort": "none",
                 "reasoning_effort_use": false,
                 "user_user_prompt_1": "",
                 "use_user_user_prompt": false,
@@ -1356,16 +1385,20 @@
                     "type": "combo",
                     "refswitch": "reasoning_effort_use",
                     "internal": [
+                        "none",
                         "minimal",
                         "low",
                         "medium",
-                        "high"
+                        "high",
+                        "xhign"
                     ],
                     "list": [
+                        "none",
                         "minimal",
                         "low",
                         "medium",
-                        "high"
+                        "high",
+                        "xhign"
                     ]
                 },
                 "customparams": {
@@ -1543,6 +1576,11 @@
     "ocrmergelines": true,
     "ocrmergelines_distance": 0.4,
     "ocr": {
+        "selfbuild": {
+            "use": false,
+            "name": "自定义",
+            "type": "other"
+        },
         "local": {
             "use": true,
             "name": "本地OCR",
@@ -1634,7 +1672,7 @@
             "is_gpt_like": true
         },
         "microsoft": {
-            "use": true,
+            "use": false,
             "color": "gray",
             "useproxy": false,
             "name": "microsoft"
@@ -1652,7 +1690,7 @@
             "name": "必应"
         },
         "google": {
-            "use": false,
+            "use": true,
             "color": "#ff0000",
             "name": "谷歌"
         },
@@ -1681,13 +1719,13 @@
             "name": "阿里"
         },
         "youdaodict": {
-            "use": true,
+            "use": false,
             "useproxy": false,
             "color": "#95a5ff",
             "name": "有道"
         },
         "caiyun": {
-            "use": true,
+            "use": false,
             "useproxy": false,
             "color": "blue",
             "name": "彩云"
@@ -1801,7 +1839,7 @@
             "name": "yandex"
         },
         "qqimt": {
-            "use": true,
+            "use": false,
             "useproxy": false,
             "color": "blue",
             "name": "qqimt"
@@ -1814,7 +1852,7 @@
             "name": "小牛"
         },
         "huoshan": {
-            "use": true,
+            "use": false,
             "color": "blue",
             "useproxy": false,
             "name": "火山"
@@ -1834,7 +1872,7 @@
             "name": "火山"
         },
         "papago": {
-            "use": true,
+            "use": false,
             "useproxy": false,
             "color": "blue",
             "name": "papago"
@@ -1881,8 +1919,7 @@
             "type": "other",
             "use": false,
             "color": "blue",
-            "name": "自定义翻译",
-            "lang": {}
+            "name": "自定义翻译"
         },
         "ibm": {
             "use": false,
@@ -1897,10 +1934,7 @@
             "name": "Sakura大模型",
             "is_gpt_like": true,
             "useproxy": false,
-            "langs": [
-                "zh",
-                "cht"
-            ]
+            "useEx": "useExfunction"
         },
         "realtime_edit": {
             "use": false,
@@ -1963,6 +1997,7 @@
     "proxies": null,
     "viewlistpos": 0,
     "wordlabel": [],
+    "wordlabel2": [],
     "getWordFallbackClipboard": true,
     "verticalhorizontal": false,
     "noundictconfig_ex": [],

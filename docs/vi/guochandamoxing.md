@@ -63,7 +63,7 @@ Tuy nhiên, đôi khi bạn có thể muốn sử dụng nhiều địa chỉ gi
 
     Đối với nền tảng Gemini, tùy chọn sẽ tự động ánh xạ thành `thinkingBudget` của Gemini, quy tắc ánh xạ: 
     
-    minimal->0 (tắt suy nghĩ, nhưng không áp dụng cho model Gemini-2.5-Pro), low->512, medium->-1 (kích hoạt suy nghĩ động), high->24576.
+    none/minimal->0 (tắt suy nghĩ, nhưng không áp dụng cho model Gemini-2.5-Pro), low->512, medium->-1 (kích hoạt suy nghĩ động), high/xhigh->24576.
 
 1. #### Các tham số khác
 
@@ -82,6 +82,10 @@ Tuy nhiên, đôi khi bạn có thể muốn sử dụng nhiều địa chỉ gi
 == Gemini
 
 **API Key** https://aistudio.google.com/app/apikey
+
+== Nvidia
+
+**API Key** https://build.nvidia.com/explore/discover
 
 == Claude
 
@@ -201,7 +205,7 @@ Thay thế `{endpoint}` và `{deployName}` bằng endpoint và deployName của 
 
 Bạn cũng có thể sử dụng các công cụ chuyển tiếp API như [new-api](https://github.com/QuantumNous/new-api) để quản lý tổng hợp nhiều nền tảng mô hình lớn và nhiều khóa một cách thuận tiện hơn.
 
-Để biết phương pháp sử dụng, bạn có thể tham khảo [bài viết này](https://www.newapi.ai/apps/luna-translator/).
+Để biết phương pháp sử dụng, bạn có thể tham khảo [bài viết này](https://www.newapi.ai/en/docs/apps/luna-translator).
 
 
 ### Mô hình triển khai ngoại tuyến

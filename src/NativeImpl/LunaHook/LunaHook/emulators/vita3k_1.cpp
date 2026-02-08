@@ -38,6 +38,25 @@ namespace
         buffer->from((char *)(address - 3));
     }
 
+    void PCSG00914(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
+    {
+        auto ptr = (char *)VITA3K::emu_arg(context)[hp1->offset] + hp1->padding;
+        std::string collect;
+        while (*ptr)
+        {
+            std::string s = ptr;
+            collect += s;
+            if (endWith(s, "\n"))
+            {
+                collect = collect.substr(0, collect.size() - 1);
+            }
+            ptr += s.size() + 1;
+        }
+        strReplace(collect, "\x87\x6e");
+        strReplace(collect, "\x87\x6c", "\x8e\xb5\x8a\x43");
+        strReplace(collect, "\x87\x6d", "\x8f\x74\x89\xcc");
+        buffer->from(collect);
+    }
     void PCSG00595(hook_context *context, HookParam *hp1, TextBuffer *buffer, uintptr_t *split)
     {
         hp1->text_fun = nullptr;
@@ -112,10 +131,24 @@ namespace
     void PCSG00766(TextBuffer *buffer, HookParam *hp)
     {
         auto s = buffer->strA();
+        if (s == u8"　")
+            return buffer->clear();
         s = re::sub(s, R"(#Ruby\[(.*?),(.*?)\])", "$1");
-        s = re::sub(s, R"((\x81\x40)*(#n)*(\x81\x40)*)");
+        if (hp->type & CODEC_UTF8)
+            s = re::sub(s, u8R"((　)*#n(　)*)");
+        else
+            s = re::sub(s, R"((\x81\x40)*(#n)*(\x81\x40)*)");
         s = re::sub(s, R"(#[A-Za-z]+\[[\d\-,\.]*\])");
         buffer->from(s);
+    }
+    void PCSG00935_2(TextBuffer *buffer, HookParam *hp)
+    {
+        static std::string last;
+        auto s = buffer->strA();
+        if (endWith(last, s))
+            buffer->clear();
+        last = s;
+        PCSG00766(buffer, hp);
     }
     void PCSG00935(TextBuffer *buffer, HookParam *hp)
     {
@@ -883,6 +916,12 @@ namespace
         strReplace(ws, L"　");
         buffer->fromWA(ws);
     }
+    void PCSG00664(TextBuffer *buffer, HookParam *hp)
+    {
+        auto s = buffer->strA();
+        s = re::sub(s, R"((\x81\x40)*\[n\](\x81\x40)*)");
+        buffer->from(s);
+    }
     void FPCSG01066(TextBuffer *buffer, HookParam *hp)
     {
         auto s = buffer->strA();
@@ -985,6 +1024,8 @@ struct emfuncinfoX
     emfuncinfo info;
 };
 static const emfuncinfoX emfunctionhooks_1[] = {
+    // なないろ リンカネーション
+    {0x80035C34, {FULL_STRING, 0, 0, 0, PCSG00664, "PCSG00664"}},
     // 白と黒のアリス
     {0x80039656, {CODEC_UTF8, 0, 0, 0, FPCSG01066, "PCSG00944"}},
     {0x80012DFE, {CODEC_UTF8, 0, 0, 0, FPCSG01066, "PCSG00944"}},
@@ -996,6 +1037,8 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x8000F3E0, {0, 0XB, 0, 0, PCSG00826, "PCSG00458"}},
     // Rear pheles
     {0x80BB4F70, {CODEC_UTF16 | USING_CHAR | DATA_INDIRECT, 1, 0, 0, all_ascii_FilterW, "PCSG00663"}},
+    {0x83CB10D4, {CODEC_UTF16 | USING_CHAR | DATA_INDIRECT, 1, 0, 0, all_ascii_FilterW, "PCSG00663"}}, // 1.00
+    {0x80848520, {CODEC_UTF16 | USING_CHAR | DATA_INDIRECT, 1, 0, 0, all_ascii_FilterW, "PCSG00663"}}, // 1.02
     // TIME TRAVELERS
     {0x8119ADDA, {0, 7, 0, 0, PCSG00062, "PCSG00062"}},
     {0x811A6052, {0, 8, 0, 0, PCSG00062, "PCSG00062"}},
@@ -1051,6 +1094,7 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     // BLACK WOLVES SAGA  -Weiβ und Schwarz-
     {0x800581a2, {CODEC_UTF8, 0, 0, 0, PCSG00766, "PCSG00935"}}, // text
     {0x800644F6, {CODEC_UTF8, 8, 0, 0, PCSG00935, "PCSG00935"}},
+    {0x800259DC, {CODEC_UTF8, 1, 0, 0, PCSG00935_2, "PCSG00935"}}, // 过场prolog
     // New Game! The Challenge Stage!
     {0x8012674c, {CODEC_UTF8, 0, 0, TPCSG00903, FPCSG00903, "PCSG00903"}},
     // 喧嘩番長 乙女
@@ -1418,6 +1462,8 @@ static const emfuncinfoX emfunctionhooks_1[] = {
     {0x8276B2CE, {CODEC_UTF16, 0x9, 0, 0, PCSG01034, "PCSG01034"}},
     // 新装版クリムゾン・エンパイア
     {0x800125AE, {CODEC_UTF8, 1, 0, 0, NewLineCharFilterA, "PCSG00481"}},
+    // うたの☆プリンスさまっ♪Repeat LOVE
+    {0x8005A534, {FULL_STRING, 1, 0x20, PCSG00914, 0, "PCSG00914"}},
     // うたの☆プリンスさまっ♪Amazing Aria & Sweet Serenade LOVE
     {0x80052B34, {0, 0, 0x24, PCSG00595, 0, "PCSG01081"}},
     // スカーレッドライダーゼクス

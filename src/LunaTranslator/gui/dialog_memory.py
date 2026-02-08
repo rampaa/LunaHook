@@ -188,6 +188,7 @@ class editswitchTextBrowserEx(QWidget):
         self.parent1 = parent
         self.fn = fn
         readoreditstack = QStackedWidget()
+        readoreditstack.setContentsMargins(0, 0, 0, 0)
         self.cache = self.fn + ".cache.html"
         self.readoreditstack = readoreditstack
         readoreditstack.currentChanged.connect(self.switch)
@@ -327,7 +328,7 @@ class dialog_memory(saveposwindow):
         openfile = IconButton(parent=self, icon="fa.external-link", tips="打开文件")
         openfile.clicked.connect(lambda: self.editororview.sourcefileopen())
         self.buttonslayout.addWidget(openfile)
-        self.buttonslayout.addWidget(IconButton(None))
+        self.buttonslayout.addWidget(IconButton(none=True))
         self.buttonslayout.addWidget(self.textbtn)
         self.buttonslayout.addWidget(self.insertaudiobtn)
         self.buttonslayout.addWidget(self.insertpicbtn)
@@ -365,7 +366,9 @@ class dialog_memory(saveposwindow):
                 self.destroyed.connect(functools.partial(safestop, self.recorders))
             except Exception as e:
                 self.recorders = None
-                QMessageBox.critical(self, _TR("错误"), str(e))
+                QMessageBox.critical(
+                    self, _TR("错误"), _TR("系统不支持环回录制")
+                )  # str(e))
                 self.insertaudiobtn.click()
         else:
             self.is_recording = False

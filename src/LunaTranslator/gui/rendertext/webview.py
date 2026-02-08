@@ -15,6 +15,7 @@ import copy, uuid
 from gui.usefulwidget import WebviewWidget
 from sometypes import WordSegResult
 from gui.rendertext.tooltipswidget import tooltipswidget
+from gui.qevent import TransparentChangedEvent
 
 
 class wordwithcolor:
@@ -30,8 +31,8 @@ class wordwithcolor:
 
 class somecommon(dataget):
     def __init__(self):
-        self.colorset = set()
-        self.ts_klass = {}
+        self.colorset: "set[ColorControl]" = set()
+        self.ts_klass: "dict[str, dict]" = {}
 
     def debugeval(self, js: str): ...
     def refreshcontent(self): ...
@@ -44,6 +45,8 @@ class somecommon(dataget):
         self.showhidetranslate(globalconfig["showfanyi"])
         self.showhidename(globalconfig["showfanyisource"])
         self.showatcenter(globalconfig["showatcenter"])
+        self.showtextareabackground(globalconfig["text_area_background"])
+        self.setTextAreaBackStyle()
         self.showhideclick()
         self.showhidert(globalconfig["isshowhira"])
         self.setfontstyle()
@@ -72,6 +75,21 @@ class somecommon(dataget):
 
     def showatcenter(self, show):
         self.debugeval("showatcenter({})".format(int(show)))
+
+    def showtextareabackground(self, show):
+        self.debugeval("showtextareabackground({})".format(int(show)))
+
+    def setTextAreaBackStyle(self, **_):
+        c = QColor(globalconfig["text_area_background_color"])
+        self.debugeval(
+            "setTextAreaBackStyle({}, {}, {}, '{}', {})".format(
+                globalconfig["text_area_background_r"],
+                globalconfig["text_area_background_w"],
+                globalconfig["text_area_background_h"],
+                c.name(QColor.NameFormat.HexRgb),
+                globalconfig["text_area_background_alpha"] / 100,
+            )
+        )
 
     def showhidert(self, show):
         self.debugeval("showhidert({})".format(int(show)))
@@ -317,12 +335,12 @@ class TextBrowser(WebviewWidget, somecommon):
     __tooltipshelper = pyqtSignal(object)
 
     def event(self, a0: QEvent) -> bool:
-        if a0.type() == QEvent.Type.User + 2:
-            self.__starttrans0checker()
+        if isinstance(a0, TransparentChangedEvent):
+            self.__starttrans0checker(a0.transparent_value())
         return super().event(a0)
 
-    def __starttrans0checker(self):
-        if gobject.base.translation_ui.transparent_value_actually == 0:
+    def __starttrans0checker(self, transparent_value):
+        if transparent_value == 0:
             self.trans0checker.start(50)
         else:
             self.trans0checker.stop()
@@ -399,17 +417,28 @@ class TextBrowser(WebviewWidget, somecommon):
             lambda: _TR("朗读"),
             lambda w: gobject.base.read_text(w.strip()),
         )
-        self.add_menu_noselect(0, lambda: _TR("清空"), self.___cleartext)
+        i = self.add_menu_noselect(0, lambda: _TR("清空"), self.___cleartext)
 
         def __cb():
             globalconfig["dragable"] = not globalconfig["dragable"]
             self.setMouseTracking(globalconfig["dragable"])
 
-        self.add_menu_noselect(
-            1,
+        i = self.add_menu_noselect(
+            i,
             lambda: _TR("可拖动的"),
             __cb,
             getchecked=lambda: globalconfig["dragable"],
+        )
+
+        def __cb2():
+            globalconfig["hidetools"] = not globalconfig["hidetools"]
+            gobject.base.translation_ui.enterfunction()
+
+        i = self.add_menu_noselect(
+            i,
+            lambda: _TR("隐藏工具栏"),
+            __cb2,
+            getchecked=lambda: globalconfig["hidetools"],
         )
         self.bind("calllunaclickedword", gobject.base.clickwordcallback)
         self.bind("calllunaMouseMove", self.calllunaMouseMove)

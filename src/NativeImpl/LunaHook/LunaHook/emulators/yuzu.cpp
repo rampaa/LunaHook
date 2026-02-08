@@ -4,11 +4,8 @@
 
 namespace
 {
-    auto isFastMem = true;
-
-    auto isVirtual = true; // Process.arch === 'x64' && Process.platform === 'windows';
-    auto idxDescriptor = isVirtual == true ? 2 : 1;
-    auto idxEntrypoint = idxDescriptor + 1;
+    auto idxDescriptor = 2;
+    auto idxEntrypoint = 3;
 
     uintptr_t getDoJitAddress()
     {
@@ -31,15 +28,39 @@ namespace
         auto Patch = find_pattern(PatchSig1, processStartAddress, processStopAddress);
         if (Patch)
         {
-            auto beginSubSig1 = "4883EC ?? 48";
-            auto lookbackSize = 0x80;
-            auto address = Patch - lookbackSize;
-            auto subs = find_pattern(beginSubSig1, address, address + lookbackSize);
+            BYTE sig3[] = {0x48, 0x83, 0xec, XX, 0x48};
+            auto subs = reverseFindBytes(sig3, sizeof(sig3), Patch - 0x80, Patch, 0, true);
             if (subs)
             {
                 idxDescriptor = 1;
                 idxEntrypoint = 2;
                 return subs;
+            }
+        }
+
+        BYTE sig2[] = {
+            // Eden-Windows-v0.0.4-rc1-amd64-clang-standard
+            0xe8, XX4,
+            0x4C, 0x8B, XX, XX,
+            0x48, 0x89, 0xF9,
+            0x48, 0x89, 0xDA,
+            0x4D, 0x89, 0xF0,
+            0xE8, XX4,
+            0x4C, 0x89, 0x36,
+            0x4C, 0x89, 0x7E, 0x08,
+            0x48, 0x83, 0xC7, 0x18,
+            0x48, 0x8B, 0x03,
+            0x48, 0x89, XX, XX,
+            0x48, 0x8B, 0x06,
+            0x48, 0x89, XX, XX};
+        RegisterBlock = MemDbg::findBytes(sig2, sizeof(sig2), processStartAddress, processStopAddress);
+        if (RegisterBlock)
+        {
+            BYTE sig3[] = {0xcc, 0x55, 0x41, 0x57, 0x41, 0x56};
+            auto subs = MemDbg::findBytes(sig3, sizeof(sig3), RegisterBlock - 0x400, RegisterBlock);
+            if (subs)
+            {
+                return subs + 1;
             }
         }
         return 0;
@@ -108,8 +129,8 @@ namespace
         auto addr = MemDbg::findBytes(target, sizeof(target), processStartAddress, processStopAddress);
         if (!addr)
             return false;
-        addr = MemDbg::find_leaorpush_addr(addr, processStartAddress, processStopAddress);
-        if (!addr)
+        auto laddr = MemDbg::find_leaorpush_addr(addr, processStartAddress, processStopAddress);
+        if (!laddr)
             return false;
         /*
 .text:0000000140B117B2 48 8D 05 67 EB 51 00                          lea     rax, aBootingGame016 ; "Booting game: {:016X} | {} | {}"
@@ -128,15 +149,48 @@ namespace
             0xb2, XX,
             0xb1, XX,
             0xe8, XX4};
-        addr = MemDbg::findBytes(sig, sizeof(sig), addr, addr + 0x100);
+        BYTE sig2[] = {
+            // Eden-Windows-v0.0.4-rc1-amd64-clang-standard
+            0xb1, XX,
+            0xb2, XX,
+            0x41, 0xB9, XX4,
+            0xe8, XX4};
+        auto addr1 = MemDbg::findBytes(sig, sizeof(sig), laddr, laddr + 0x100);
+        auto addr2 = MemDbg::findBytes(sig2, sizeof(sig2), laddr, laddr + 0x100);
+        addr = (addr1 && addr2) ? max(addr1, addr2) : (addr1 ? addr1 : addr2);
+        int ver = addr == addr2 ? 1 : 0;
+        if (!addr)
+        {
+            // citron 2026.2.1 pgo
+            BYTE sig3[] = {
+                0xb2, 0x02,
+                0x48, 0x89, XX, XX, XX,
+                0x4c, 0x89, XX, XX, XX,
+                0x48, XX4, XX4,
+                0xe8, XX4};
+            addr = MemDbg::findBytes(sig3, sizeof(sig3), laddr, laddr + 0x100);
+            ver = 2;
+        }
         if (!addr)
             return false;
         HookParam hp;
-        hp.address = addr + 9 + *(int *)(addr + 5);
-        hp.user_value = *(char *)(addr + 1) | ((*(char *)(addr + 3)) << 8);
+        if (ver == 0)
+        {
+            hp.address = addr + 9 + *(int *)(addr + 5);
+            hp.user_value = *(char *)(addr + 1) | ((*(char *)(addr + 3)) << 8);
+        }
+        else if (ver == 1)
+        {
+            hp.address = addr + 2 + 2 + 6 + 5 + *(int *)(addr + 2 + 2 + 6 + 1);
+            hp.user_value = *(char *)(addr + 3) | ((*(char *)(addr + 1)) << 8);
+        }
+        else if (ver == 2)
+        {
+            hp.address = addr + 2 + 5 + 5 + 9 + 5 + *(int *)(addr + 2 + 5 + 5 + 9 + 1);
+        }
         hp.text_fun = [](hook_context *context, HookParam *hp, TextBuffer *buffer, uintptr_t *split)
         {
-            if (((uint8_t)context->argof(2) | ((uint8_t)context->argof(1) << 8)) != hp->user_value)
+            if (hp->user_value && (((uint8_t)context->argof(2) | ((uint8_t)context->argof(1) << 8)) != hp->user_value))
                 return;
             auto loadinfo = (char *)context->argof(5);
             if (strcmp("BootGame", loadinfo))
@@ -236,6 +290,7 @@ struct NSGameInfoC
 
 bool yuzu::attach_function1()
 {
+    // Eden-Windows-v0.0.4-rc2&&rc3，同一个函数只能捕获到极少量函数了，懒得弄了。
     auto DoJitPtr = getDoJitAddress();
     if (!DoJitPtr)
         return false;

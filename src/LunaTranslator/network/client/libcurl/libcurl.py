@@ -1,5 +1,4 @@
-import gobject
-from requests import RequestException, Timeout
+import gobject, requests
 from ctypes import (
     CDLL,
     c_void_p,
@@ -18,6 +17,7 @@ from ctypes import (
 
 libcurl = CDLL(gobject.GetDllpath(("libcurl.dll", "libcurl-x64.dll")))
 
+libcurl_Accept_Encoding = "gzip, deflate, br, zstd"
 
 class curl_ws_frame(Structure):
     _fields_ = [
@@ -262,7 +262,7 @@ CURLWS_CLOSE = 1 << 3
 WRITEFUNCTION = CFUNCTYPE(c_size_t, POINTER(c_char), c_size_t, c_size_t, c_void_p)
 
 
-class CURLException(RequestException):
+class CURLException(requests.exceptions.RequestException):
     OK = 0
     UNSUPPORTED_PROTOCOL = 1
     FAILED_INIT = 2
@@ -376,5 +376,5 @@ def MaybeRaiseException(error):
         return
     e = CURLException(error)
     if error == CURLException.OPERATION_TIMEDOUT:
-        raise Timeout(e)
+        raise requests.exceptions.Timeout(e)
     raise e

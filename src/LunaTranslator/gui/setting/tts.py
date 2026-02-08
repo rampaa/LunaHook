@@ -1,7 +1,7 @@
 from qtsymbols import *
 import os, functools
 import gobject
-from myutils.utils import splitocrtypes
+from myutils.utils import splitocrtypes, selectdebugfile, useExCheck
 from myutils.config import globalconfig
 from gui.inputdialog import (
     autoinitdialog_items,
@@ -141,6 +141,8 @@ def getttsgrid(self, names):
         _f = "LunaTranslator/tts/{}.py".format(name)
         if os.path.exists(_f) == False:
             continue
+        if not useExCheck(name, "tts." + name, "reader"):
+            continue
         if "args" in globalconfig["reader"][name]:
             items = autoinitdialog_items(globalconfig["reader"][name])
             items[-1]["callback"] = functools.partial(
@@ -158,7 +160,11 @@ def getttsgrid(self, names):
                     name,
                 )
             )
-
+        elif name == "selfbuild":
+            _3 = D_getIconButton(
+                callback=lambda: selectdebugfile("selfbuild_tts.py"),
+                icon="fa.edit",
+            )
         else:
             _3 = ""
 
@@ -303,7 +309,7 @@ def setTab5lz(self):
                                                 "tts_repair_regex"
                                             ],
                                             "语音修正",
-                                            ["正则", "转义", "原文", "替换"],
+                                            ["原文", "替换"],
                                             extraX=globalconfig["ttscommon"],
                                         )
                                     ),

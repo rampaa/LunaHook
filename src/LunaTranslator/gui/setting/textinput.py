@@ -90,7 +90,6 @@ def gethookgrid_em(self):
                 globalconfig["embedded"],
                 "timeout_translate",
                 double=True,
-                step=0.1,
                 callback=lambda x: gobject.base.textsource.flashembedsettings(),
             ),
         ],
@@ -116,6 +115,25 @@ def gethookgrid_em(self):
                 callback=lambda _: gobject.base.textsource.flashembedsettings(),
             ),
             creategamefont_comboBox,
+        ],
+        [
+            "修改游戏字体相对大小",
+            D_getsimpleswitch(
+                globalconfig["embedded"],
+                "changefontsize_use",
+                default=False,
+                callback=lambda _: gobject.base.textsource.flashembedsettings(),
+            ),
+            D_getspinbox(
+                0.5,
+                2,
+                globalconfig["embedded"],
+                "changefontsize",
+                step=0.01,
+                double=True,
+                default=1,
+                callback=lambda _: gobject.base.textsource.flashembedsettings(),
+            ),
         ],
         [
             "内嵌安全性检查",
@@ -645,20 +663,20 @@ def filetranslate(self):
         [
             functools.partial(
                 createfoldgrid,
-                functools.partial(getnetgrid, self),
-                "网络服务",
+                [["使用代理", proxyusage]],
+                "代理设置",
                 globalconfig["foldstatus"]["others"],
-                "netservice",
-                leftwidget=D_getdoclink("apiservice.html"),
+                "proxy",
             )
         ],
         [
             functools.partial(
                 createfoldgrid,
-                [["使用代理", proxyusage]],
-                "代理设置",
+                functools.partial(getnetgrid, self),
+                "网络服务",
                 globalconfig["foldstatus"]["others"],
-                "proxy",
+                "netservice",
+                leftwidget=D_getdoclink("apiservice.html"),
             )
         ],
     ]

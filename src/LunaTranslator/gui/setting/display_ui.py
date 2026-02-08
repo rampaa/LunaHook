@@ -312,7 +312,6 @@ def uisetting(self):
                                         globalconfig,
                                         "settingfontsize",
                                         double=True,
-                                        step=0.1,
                                         callback=lambda _: gobject.base.setcommonstylesheet(),
                                     ),
                                     "",
@@ -343,7 +342,7 @@ def uisetting(self):
                                         "darklight2",
                                         lambda _: (
                                             gobject.base.setcommonstylesheet(),
-                                            switch_webview2_darklight(),
+                                            gobject.base.switch_darklight(),
                                         ),
                                     ),
                                 ],
@@ -375,11 +374,6 @@ def uisetting(self):
     ]
 
     return mainuisetting(self) + __
-
-
-def switch_webview2_darklight():
-    for widget in QApplication.allWidgets():
-        QApplication.postEvent(widget, QEvent(QEvent.Type.User + 1))
 
 
 def createdynamicswitch(self):

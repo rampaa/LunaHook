@@ -1,9 +1,14 @@
 from translator.basetranslator import basetrans, GptTextWithDict, GptDict
 import requests
 import json
-from myutils.utils import urlpathjoin
+from myutils.config import urlpathjoin
 from language import Languages
 from translator.gptcommon import list_models
+from myutils.utils import getlangtgt
+
+
+def useExfunction():
+    return getlangtgt() in (Languages.Chinese, Languages.TradChinese)
 
 
 class TS(basetrans):
@@ -118,11 +123,15 @@ class TS(basetrans):
             else:
                 content = "将下面的日文文本翻译成中文：" + query
             messages.append({"role": "user", "content": content})
-        elif prompt_version == 3:
+        elif prompt_version in (3, 4):
             messages = [
                 {
                     "role": "system",
-                    "content": "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。",
+                    "content": (
+                        "你是一个视觉小说翻译模型，可以通顺地使用给定的术语表以指定的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，注意不要混淆使役态和被动态的主语和宾语，不要擅自添加原文中没有的特殊符号，也不要擅自增加或减少换行。"
+                        if prompt_version == 3
+                        else "你是一个日本二次元领域的日语翻译模型，可以流畅通顺地以日本轻小说/漫画/Galgame的风格将日文翻译成简体中文，并联系上下文正确使用人称代词，不擅自添加原文中没有的代词。"
+                    ),
                 }
             ]
             __gptdict = self.make_gpt_dict_text(gpt_dict)
@@ -177,7 +186,7 @@ class TS(basetrans):
                 urlpathjoin(self.api_url, "chat/completions"), json=data
             )
 
-        except requests.RequestException as e:
+        except requests.exceptions.RequestException as e:
             raise ValueError("无法连接Sakura API，可能未正确部署Sakura模型")
         try:
             yield output.json()
@@ -212,7 +221,7 @@ class TS(basetrans):
                 json=data,
                 stream=True,
             )
-        except requests.RequestException:
+        except requests.exceptions.RequestException:
             raise ValueError("无法连接Sakura API，可能未正确部署Sakura模型")
 
         if (not output.headers["Content-Type"].startswith("text/event-stream")) and (

@@ -12,6 +12,7 @@ from myutils.config import (
     savehook_new_list,
     translatorsetting,
 )
+from textio.textsource.texthook import texthook
 from gui.setting.about import get_about_info
 from myutils.magpie_builtin import MagpieBuiltin, AdapterService
 from gui.gamemanager.dialog import dialog_setting_game
@@ -26,6 +27,7 @@ from myutils.utils import (
 )
 from myutils.hwnd import mouseselectwindow, grabwindow, getExeIcon, getcurrexe
 from myutils.updater import doupdate
+from gui.qevent import TransparentChangedEvent
 from gui.dialog_memory import dialog_memory
 from gui.rendertext.texttype import TextType, SpecialColor
 from gui.textbrowser import Textbrowser
@@ -330,9 +332,10 @@ class ButtonBar(QFrame):
 class TranslatorWindow(resizableframeless):
     displayglobaltooltip = pyqtSignal(str)
     displayres = pyqtSignal(dict)
-    displayraw1 = pyqtSignal(str, bool)
+    displayraw1 = pyqtSignal(str, bool, bool)
     displayraw2 = pyqtSignal(str)
     displaystatus = pyqtSignal(str, int)
+    displaystatusklass = pyqtSignal(str, int, str)
     showhideuisignal = pyqtSignal()
     toolbarhidedelaysignal = pyqtSignal()
     showsavegame_signal = pyqtSignal()
@@ -350,6 +353,7 @@ class TranslatorWindow(resizableframeless):
     changeshowhiderawsig = pyqtSignal()
     changeshowhidetranssig = pyqtSignal()
     magpiecallback = pyqtSignal(bool)
+    showMarkDownSig = pyqtSignal(str)
 
     def setbuttonsizeX(self):
         self.changeextendstated()
@@ -439,7 +443,7 @@ class TranslatorWindow(resizableframeless):
         t.timeout.emit()
         t.start()
 
-    def showres(self, kwargs):
+    def showres(self, kwargs: dict):
         try:
             name = kwargs.get("name", "")
             color = kwargs.get("color")
@@ -447,6 +451,7 @@ class TranslatorWindow(resizableframeless):
             iter_context = kwargs.get("iter_context", None)
             clear = kwargs.get("clear", False)
             klass = kwargs.get("klass", None)
+            is_auto_run = kwargs.get("is_auto_run", True)
             self.showline(
                 name=name,
                 clear=clear,
@@ -455,6 +460,7 @@ class TranslatorWindow(resizableframeless):
                 texttype=TextType.Translate,
                 iter_context=iter_context,
                 klass=klass,
+                is_auto_run=is_auto_run,
             )
 
         except:
@@ -467,7 +473,7 @@ class TranslatorWindow(resizableframeless):
 
         self.translate_text.updatetext(TextType.Origin, text, hira, color)
 
-    def showraw(self, text, updateTranslate):
+    def showraw(self, text, updateTranslate, is_auto_run):
         color = SpecialColor.RawTextColor
         clear = True
         text = self.cleartext(text)
@@ -481,7 +487,7 @@ class TranslatorWindow(resizableframeless):
             updateTranslate=updateTranslate,
         )
 
-    def showstatus(self, res, t: TextType):
+    def showstatus(self, res, t: TextType, klass=None):
         if t == TextType.Info:
             color = SpecialColor.RawTextColor
             clear = True
@@ -491,7 +497,7 @@ class TranslatorWindow(resizableframeless):
         elif t == TextType.Error_translator:
             color = SpecialColor.ErrorColor
             clear = False
-        self.showline(clear=clear, text=res, color=color, texttype=t)
+        self.showline(clear=clear, text=res, color=color, texttype=t, klass=klass)
 
     def cleartext(self, text: str):
         text = text.replace("\t", " ")
@@ -528,10 +534,13 @@ class TranslatorWindow(resizableframeless):
         klass = kwargs.get("klass", None)
         raw = kwargs.get("raw", False)
         updateTranslate = kwargs.get("updateTranslate", False)
+        is_auto_run = kwargs.get("is_auto_run", True)
         if text is None:
             if clear:
                 self.translate_text.clear()
             return
+        if not is_auto_run:
+            self.show_()
         if not raw:
             text = self.cleartext(text)
         if iter_context:
@@ -602,8 +611,6 @@ class TranslatorWindow(resizableframeless):
 
     @threader
     def ocr_do_function(self, rect, img=None):
-        if not rect:
-            return
         if not img:
             img = imageCut(0, rect[0][0], rect[0][1], rect[1][0], rect[1][1])
         result = ocr_run(img)
@@ -786,7 +793,8 @@ class TranslatorWindow(resizableframeless):
             (
                 "grabwindow",
                 buttonfunctions(
-                    clicked=grabwindow, rightclick=lambda: grabwindow(tocliponly=True)
+                    clicked=lambda: grabwindow(screenshot=True),
+                    rightclick=lambda: grabwindow(tocliponly=True, screenshot=True),
                 ),
             ),
             (
@@ -1021,6 +1029,7 @@ class TranslatorWindow(resizableframeless):
         self.displayglobaltooltip.connect(self.displayglobaltooltip_f)
         self.ocr_once_signal.connect(self.ocr_once_function)
         self.displaystatus.connect(self.showstatus)
+        self.displaystatusklass.connect(self.showstatus)
         self.showhideuisignal.connect(self.showhideui)
         self.displayres.connect(self.showres)
         self.displayraw1.connect(self.showraw)
@@ -1079,6 +1088,7 @@ class TranslatorWindow(resizableframeless):
                 else None
             )
         )
+        self.showMarkDownSig.connect(self.showMarkDown)
         icon = getExeIcon(getcurrexe())
         self.setWindowIcon(icon)
         self.firstshow = True
@@ -1251,41 +1261,35 @@ class TranslatorWindow(resizableframeless):
         except:
             pass
 
-    def showabout(self):
-
-        def makeMDlinkclick(text: str) -> "list[WordSegResult]":
-            if "\n" in text:
-                __ = []
-                for i, _ in enumerate(makeMDlinkclick(_) for _ in text.split("\n")):
-                    if i:
-                        __.append(WordSegResult("\n"))
-                    __ += _
-                return __
-            result = []
-            while text:
-                if text[0] == "[":
-                    _right = text.find("]")
-                    _r2 = text.find(")")
-                    result.append(
-                        WordSegResult(
-                            text[1:_right], specialinfo=text[_right + 2 : _r2]
-                        )
-                    )
-                    text = text[_r2 + 1 :]
+    def __makeMDlinkclick(self, text: str) -> "list[WordSegResult]":
+        if "\n" in text:
+            __ = []
+            for i, _ in enumerate(self.__makeMDlinkclick(_) for _ in text.split("\n")):
+                if i:
+                    __.append(WordSegResult("\n"))
+                __ += _
+            return __
+        result = []
+        while text:
+            if text[0] == "[":
+                _right = text.find("]")
+                _r2 = text.find(")")
+                result.append(
+                    WordSegResult(text[1:_right], specialinfo=text[_right + 2 : _r2])
+                )
+                text = text[_r2 + 1 :]
+            else:
+                if "[" in text:
+                    left = text.find("[")
+                    result.append(WordSegResult(text[:left], isshit=True))
+                    text = text[left:]
                 else:
-                    if "[" in text:
-                        left = text.find("[")
-                        result.append(WordSegResult(text[:left], isshit=True))
-                        text = text[left:]
-                    else:
-                        result.append(WordSegResult(text, isshit=True))
-                        text = None
-            return result
+                    result.append(WordSegResult(text, isshit=True))
+                    text = None
+        return result
 
-        _t = get_about_info()
-        if not globalconfig["adaptive_height"]:
-            _t = _t.replace("\n\n", "\n")
-        segs = makeMDlinkclick(_t)
+    def showMarkDown(self, md):
+        segs = self.__makeMDlinkclick(md)
         text = "".join(_.word for _ in segs)
         self.showline(
             text=text,
@@ -1294,6 +1298,13 @@ class TranslatorWindow(resizableframeless):
             raw=True,
             color=SpecialColor.RawTextColor,
         )
+
+    def showabout(self):
+
+        _t = get_about_info()
+        if not globalconfig["adaptive_height"]:
+            _t = _t.replace("\n\n", "\n")
+        self.showMarkDown(_t)
 
     def showEvent(self, e):
         super().showEvent(e)
@@ -1380,23 +1391,21 @@ class TranslatorWindow(resizableframeless):
         )
         bottomr3 = self.createborderradiusstring(use_r2, False)
         bottomr = self.createborderradiusstring(radiu_valid * use_r2, True, True)
+        transparent_value_actually = max(
+            (1 - globalconfig["transparent_EX"]) * 100 / 255,
+            globalconfig["transparent"] * (not globalconfig["backtransparent"]),
+        )
         self.translate_text.setStyleSheet(
             "Textbrowser{border-width: 0;%s;background-color: %s}"
             % (
                 topr,
-                str2rgba(globalconfig["backcolor"], self.transparent_value_actually),
+                str2rgba(globalconfig["backcolor"], transparent_value_actually),
             )
         )
         self.titlebar.setstyle(bottomr, bottomr3)
         QApplication.postEvent(
-            self.translate_text.textbrowser, QEvent(QEvent.Type.User + 2)
-        )
-
-    @property
-    def transparent_value_actually(self):
-        return max(
-            (1 - globalconfig["transparent_EX"]) * 100 / 255,
-            globalconfig["transparent"] * (not globalconfig["backtransparent"]),
+            self.translate_text.textbrowser,
+            TransparentChangedEvent(transparent_value_actually),
         )
 
     def muteprocessfuntion(self):
@@ -1703,9 +1712,6 @@ class TranslatorWindow(resizableframeless):
 
     @tryprint
     def afterrange(self, clear, rect, img=None):
-        (x1, y1), (x2, y2) = rect
-        if x1 == x2 or y1 == y2:
-            return
         if clear or not globalconfig["multiregion"]:
             gobject.base.textsource.clearrange()
         gobject.base.textsource.newrangeadjustor()
@@ -1729,11 +1735,13 @@ class TranslatorWindow(resizableframeless):
     @threader
     def startTranslater(self):
         t = None
+        isFromHook = isinstance(gobject.base.textsource, texthook)
         if gobject.base.textsource:
             t = gobject.base.textsource.gettextonce()
         if not t:
             t = gobject.base.currenttext
-        gobject.base.textgetmethod(t, False)
+            isFromHook = False
+        gobject.base.textgetmethod(t, is_auto_run=False, isFromHook=isFromHook)
 
     def toolbarhidedelay(self):
 
@@ -1775,32 +1783,35 @@ class TranslatorWindow(resizableframeless):
         self.enterfunction(delay=-1)
 
     @threader
-    def dodelayhide(self, delay):
-        enter_sig = uuid.uuid4()
-        self.enter_sig = enter_sig
-        if delay == -1:
-            return
-        while self.checkisentered():
-            time.sleep(0.1)
-        self._isentered = False
+    def dodelayhide(self, delay, force=False):
+        if not force:
+            enter_sig = uuid.uuid4()
+            self.enter_sig = enter_sig
+            if delay == -1:
+                return
+            while self.checkisentered():
+                time.sleep(0.1)
+            self._isentered = False
 
-        if delay is None:
-            delay = globalconfig["disappear_delay_tool"]
-        time.sleep(delay)
-        if self.enter_sig != enter_sig:
-            return
-        if globalconfig["locktools"]:
-            return
+            if delay is None:
+                delay = globalconfig["disappear_delay_tool"]
+            time.sleep(delay)
+            if self.enter_sig != enter_sig:
+                return
+            if globalconfig["locktools"]:
+                return
         self.toolbarhidedelaysignal.emit()
 
     def enterfunction(self, delay=None):
-        if (not globalconfig["locktoolsEx"]) or self.checklocktoolsEx():
+        if (not globalconfig["hidetools"]) and (
+            (not globalconfig["locktoolsEx"]) or self.checklocktoolsEx()
+        ):
             self.titlebar.show()
         self.translate_text.textbrowser.setVisible(True)
         self.autohidestart = True
         self.lastrefreshtime = time.time()
         self.set_color_transparency()
-        self.dodelayhide(delay)
+        self.dodelayhide(delay, force=globalconfig["hidetools"])
 
     def resizeEvent(self, e: QResizeEvent):
         super().resizeEvent(e)
@@ -1869,4 +1880,4 @@ class TranslatorWindow(resizableframeless):
         except:
             print_exc()
 
-        super().closeEvent(a0)
+        os._exit(0)

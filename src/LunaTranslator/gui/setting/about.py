@@ -1,8 +1,8 @@
 from qtsymbols import *
 import functools, re
-from myutils.config import globalconfig, static_data, _TR
+from myutils.config import globalconfig, static_data, _TR, dynamiclink
 from myutils.wrapper import threader
-from myutils.utils import makehtml, getlanguse, dynamiclink
+from myutils.utils import makehtml, getlanguse
 import requests, importlib
 import gobject
 import os, NativeUtils
@@ -18,7 +18,10 @@ from gui.usefulwidget import (
     LinkLabel,
     SClickableLabel,
     VisLFormLayout,
+    D_getIconButton,
+    tabadd_lazy,
 )
+from gui.setting.setting_year import yearsummary
 from language import UILanguages, Languages
 from myutils.updater import versionchecktask
 
@@ -171,9 +174,9 @@ class MDLabel1(MDLabel):
 
 def get_about_info():
     lang = getlanguse()
-    t3 = "如果使用中遇到困难，可以查阅[使用说明](/)、观看[我的B站视频](https://space.bilibili.com/592120404/video)，也欢迎加入[QQ群](https://qm.qq.com/q/I5rr3uEpi2)。"
+    t3 = "如果使用中遇到困难，可以查阅[使用说明](/)、观看[我的B站视频](https://space.bilibili.com/592120404/video)，也欢迎加入[QQ群](https://qm.qq.com/q/mPSu3sG5ri)。"
     t2 = "软件维护不易，如果您感觉该软件对你有帮助，欢迎通过[爱发电](https://afdian.com/a/HIllya51)，或[微信扫码](WEIXIN)赞助，您的支持将成为软件长期维护的助力，谢谢~"
-    t5 = "如果使用中遇到困難，可以查閱[使用說明](/)、觀看[我的 B 站影片](https://space.bilibili.com/592120404/video)，也歡迎加入 [Discord](https://discord.com/invite/ErtDwVeAbhtB)／[QQ 群](https://qm.qq.com/q/I5rr3uEpi2)。"
+    t5 = "如果使用中遇到困難，可以查閱[使用說明](/)、觀看[我的 B 站影片](https://space.bilibili.com/592120404/video)，也歡迎加入 [Discord](https://discord.com/invite/ErtDwVeAbhtB)／[QQ 群](https://qm.qq.com/q/mPSu3sG5ri)。"
     t6 = "如果使用中遇到困难，可以查阅[使用说明](/)，也欢迎加入[Discord](https://discord.com/invite/ErtDwVeAbB)。"
     t4 = "软件维护不易，如果您感觉该软件对你有帮助，欢迎通过[patreon](https://patreon.com/HIllya51)支持我，您的支持将成为软件长期维护的助力，谢谢~"
     if lang == Languages.Chinese:
@@ -326,7 +329,12 @@ class __delayloadlangs(QHBoxLayout):
         )
 
 
-def setTab_about(self, basel):
+def setTab_about(self: QWidget, basel):
+    def ____():
+        tabadd_lazy(
+            self.tab_widget, _TR("年度总结"), functools.partial(yearsummary, self)
+        )
+        self.tab_widget.adjust_list_widget_width()
 
     makescrollgrid(
         [
@@ -386,14 +394,16 @@ def setTab_about(self, basel):
                         makelink("sindresorhus/github-markdown-css"),
                         makelink("gexgd0419/NaturalVoiceSAPIAdapter"),
                         makelink("microsoft/PowerToys"),
+                        makelink("WaterJuice/WjCryptLib"),
+                        makelink("dpirch/libfvad"),
                     ],
                     "LICENSE",
                 )
             ],
+            [D_getIconButton(____, icon="fa.calendar")],
         ],
         basel,
     )
-
     gobject.base.connectsignal(
         gobject.base.progresssignal4,
         functools.partial(
